@@ -41,7 +41,20 @@ export async function POST(req: NextRequest) {
 
     switch (topic) {
       case "questions": {
-        await handleQuestion(resource);
+        console.log(`[v0] Processing question: ${resource}`);
+        try {
+          await handleQuestion(resource);
+          console.log(`[v0] Question processed successfully`);
+        } catch (qErr) {
+          const qMsg = qErr instanceof Error ? qErr.message : String(qErr);
+          console.log(`[v0] Question handling FAILED: ${qMsg}`);
+          addActivityLog({
+            type: "error",
+            message: `Error procesando pregunta: ${qMsg.slice(0, 120)}`,
+            details: resource,
+          });
+          await notifyError("question", qMsg).catch(() => {});
+        }
         break;
       }
 
