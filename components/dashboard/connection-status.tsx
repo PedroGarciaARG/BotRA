@@ -258,10 +258,17 @@ export function ConnectionStatus({
         </Button>
       )}
 
-      {authError && !authenticated && (
-        <span className="max-w-xs truncate text-xs text-destructive">
-          {authError}
-        </span>
+      {authError && (
+        <div className="flex items-center gap-2">
+          <span className="max-w-xs truncate text-xs text-destructive">
+            {authError}
+          </span>
+          {authenticated && (authError.includes("invalid_client") || authError.includes("invalid_grant") || authError.includes("Token refresh failed")) && (
+            <Button variant="destructive" size="sm" asChild>
+              <a href="/api/auth/mercadolibre">Re-autenticar ML</a>
+            </Button>
+          )}
+        </div>
       )}
 
       {/* Bot toggle */}
