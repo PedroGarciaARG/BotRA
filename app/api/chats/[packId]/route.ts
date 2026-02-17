@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getPackMessages } from "@/lib/mercadolibre/api";
 import { getAccessToken } from "@/lib/mercadolibre/auth";
 import { getSellerId } from "@/lib/mercadolibre/auth";
 
 export async function GET(
-  request: NextRequest,
+  _request: Request,
   { params }: { params: Promise<{ packId: string }> }
 ) {
   try {
@@ -16,21 +16,14 @@ export async function GET(
 
     const { packId } = await params;
 
-    // Check if caller indicated this is an order-based ID (no real pack)
-    const { searchParams } = new URL(request.url);
-    const isOrderFallback = searchParams.get("type") === "order";
-
-    console.log(`[v0] Fetching messages for ${isOrderFallback ? "order" : "pack"} ${packId}`);
-
-    const data = await getPackMessages(packId, sellerId, isOrderFallback);
+    // ML docs: always use /messages/packs/{id} even if id is an order_id
+    const data = await getPackMessages(packId, sellerId);
 
     // Sort messages oldest first for chat display
     const messages = (data.messages || []).sort(
       (a, b) =>
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
-
-    console.log(`[v0] Found ${messages.length} messages for ${packId}`);
 
     return NextResponse.json({
       messages: messages.map((m) => ({
