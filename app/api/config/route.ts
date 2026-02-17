@@ -12,14 +12,26 @@ export async function GET() {
     return "***" + val.slice(-6);
   }
 
+  // Check which come from actual env vars vs in-memory overrides
+  const envKeys = ["ML_APP_ID", "ML_CLIENT_SECRET", "ML_REFRESH_TOKEN", "TELEGRAM_TOKEN", "TELEGRAM_CHAT_ID", "GOOGLE_SCRIPT_URL"] as const;
+  const sources: Record<string, string> = {};
+  for (const key of envKeys) {
+    if ((process.env[key] || "").trim()) {
+      sources[key] = "env";
+    } else if (config[key as keyof typeof config]) {
+      sources[key] = "memoria";
+    } else {
+      sources[key] = "missing";
+    }
+  }
+
   return NextResponse.json({
-    ML_APP_ID: config.ML_APP_ID, // Not secret, can show full
+    ML_APP_ID: config.ML_APP_ID,
     ML_CLIENT_SECRET: mask(config.ML_CLIENT_SECRET),
     ML_REFRESH_TOKEN: mask(config.ML_REFRESH_TOKEN),
     TELEGRAM_TOKEN: mask(config.TELEGRAM_TOKEN),
-    TELEGRAM_CHAT_ID: config.TELEGRAM_CHAT_ID, // Not secret
-    GOOGLE_SCRIPT_URL: config.GOOGLE_SCRIPT_URL, // Not secret
-    // Indicate which ones are set
+    TELEGRAM_CHAT_ID: config.TELEGRAM_CHAT_ID,
+    GOOGLE_SCRIPT_URL: config.GOOGLE_SCRIPT_URL,
     _set: {
       ML_APP_ID: !!config.ML_APP_ID,
       ML_CLIENT_SECRET: !!config.ML_CLIENT_SECRET,
@@ -28,6 +40,7 @@ export async function GET() {
       TELEGRAM_CHAT_ID: !!config.TELEGRAM_CHAT_ID,
       GOOGLE_SCRIPT_URL: !!config.GOOGLE_SCRIPT_URL,
     },
+    _source: sources,
   });
 }
 
