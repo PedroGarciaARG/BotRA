@@ -60,17 +60,17 @@ export function WebhookGuide() {
       const simRes = await fetch("/api/webhook/simulate", { method: "POST" });
       const simData = await simRes.json();
 
-      if (simData.success) {
+      if (simData.success && simData.action === "sent") {
         setTestResult({
           success: true,
-          message: simData.message || "Webhook procesado correctamente",
+          message: simData.message || "Mensaje enviado correctamente",
           details: simData.details,
         });
       } else {
         setTestResult({
           success: false,
-          message: simData.error || "Error en simulacion",
-          details: simData.details,
+          message: simData.error || simData.message || "Error en simulacion",
+          details: `[${simData.action || "unknown"}] ${simData.details || ""}`,
         });
       }
     } catch (err) {

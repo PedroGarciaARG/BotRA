@@ -240,9 +240,10 @@ export function CredentialsPanel() {
           Credenciales
         </CardTitle>
         <CardDescription>
-          Configura las credenciales de MercadoLibre, Telegram y Google Sheets.
-          Los valores se guardan en memoria del servidor (se resetean con cada
-          deploy).
+          Credenciales de MercadoLibre, Telegram y Google Sheets. Los valores
+          base se cargan desde las variables de entorno (Vars en el sidebar) y
+          persisten entre deploys. Desde aqui podes sobreescribirlos
+          temporalmente en memoria.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
@@ -270,9 +271,9 @@ export function CredentialsPanel() {
             </Button>
 
             <p className="text-[11px] text-muted-foreground text-center">
-              Solo completa los campos que quieras cambiar. Los demas se
-              mantienen como estan. Los valores tambien se pueden configurar como
-              variables de entorno en Vercel (Vars en el sidebar).
+              Las credenciales se cargan automaticamente desde las variables de
+              entorno (Vars). Solo completa los campos si quieres sobreescribir
+              temporalmente. Para que persistan entre deploys, editalas en Vars.
             </p>
           </>
         )}

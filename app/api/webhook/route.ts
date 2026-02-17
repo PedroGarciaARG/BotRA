@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
       }
 
       case "orders_v2": {
-        console.log(`[v0] Processing orders_v2: ${resource}`);
-        await handleOrderNotification(resource);
+        const result = await handleOrderNotification(resource);
+        console.log(`[v0] Order result: action=${result.action}, message=${result.message}`);
         break;
       }
 

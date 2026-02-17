@@ -1,5 +1,5 @@
 // Simulate a webhook to test the full pipeline.
-// Fetches the most recent paid order from ML and processes it.
+// Fetches the most recent paid order from ML and processes it with force=true.
 
 import { NextResponse } from "next/server";
 import { getAccessToken, getSellerId } from "@/lib/mercadolibre/auth";
@@ -9,7 +9,6 @@ import { addActivityLog } from "@/lib/storage";
 
 export async function POST() {
   try {
-    // Ensure we have a valid token
     await getAccessToken();
     const sellerId = getSellerId();
 
@@ -20,7 +19,6 @@ export async function POST() {
       });
     }
 
-    // Fetch most recent orders
     const ordersData = await getSellerOrders(sellerId, 5, 0);
     const orders = ordersData.results || [];
 
@@ -31,10 +29,8 @@ export async function POST() {
       });
     }
 
-    // Find the most recent paid order
     const paidOrder = orders.find((o) => o.status === "paid");
     const latestOrder = paidOrder || orders[0];
-
     const itemTitle =
       latestOrder.order_items?.[0]?.item?.title || "Producto desconocido";
 
@@ -44,29 +40,28 @@ export async function POST() {
       details: `Order: ${latestOrder.id} | Status: ${latestOrder.status} | Item: ${itemTitle}`,
     });
 
-    if (latestOrder.status === "paid") {
-      // Process it through the normal order handler
-      try {
-        await handleOrderNotification(`/orders/${latestOrder.id}`);
-        return NextResponse.json({
-          success: true,
-          message: `Orden procesada: ${itemTitle}`,
-          details: `Order ID: ${latestOrder.id} | Comprador: ${latestOrder.buyer.nickname} | Estado: ${latestOrder.status}. Revisa el chat de ML para ver si se envio el mensaje de bienvenida.`,
-        });
-      } catch (orderErr) {
-        return NextResponse.json({
-          success: false,
-          error: `Error procesando orden: ${orderErr instanceof Error ? orderErr.message : "unknown"}`,
-          details: `Order ID: ${latestOrder.id} | Item: ${itemTitle}`,
-        });
-      }
-    } else {
+    if (latestOrder.status !== "paid") {
       return NextResponse.json({
         success: false,
         error: `La orden mas reciente no esta pagada (status: ${latestOrder.status})`,
-        details: `Order ID: ${latestOrder.id} | Item: ${itemTitle} | Comprador: ${latestOrder.buyer.nickname}. Necesitas una orden con status "paid" para simular el flujo completo.`,
+        details: `Order ID: ${latestOrder.id} | Item: ${itemTitle} | Comprador: ${latestOrder.buyer.nickname}`,
       });
     }
+
+    // Process with force=true to skip pack state and message-history checks
+    const result = await handleOrderNotification(
+      `/orders/${latestOrder.id}`,
+      { force: true }
+    );
+
+    const packId = String(latestOrder.pack_id || latestOrder.id);
+
+    return NextResponse.json({
+      success: result.action === "sent",
+      action: result.action,
+      message: result.message,
+      details: `Order: ${latestOrder.id} | Pack: ${packId} | Seller: ${sellerId} | Buyer: ${latestOrder.buyer.id} | Item: ${itemTitle}`,
+    });
   } catch (err) {
     return NextResponse.json({
       success: false,

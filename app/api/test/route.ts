@@ -13,14 +13,23 @@ export async function GET() {
     botEnabled: getBotEnabled(),
   };
 
-  // 1. Check env vars
+  // 1. Check env vars (both process.env and runtime config)
+  const config = await import("@/lib/storage").then((m) => m.getConfig());
   results.envVars = {
-    ML_APP_ID: !!process.env.ML_APP_ID,
-    ML_CLIENT_SECRET: !!process.env.ML_CLIENT_SECRET,
-    ML_REFRESH_TOKEN: !!process.env.ML_REFRESH_TOKEN,
-    GOOGLE_SCRIPT_URL: !!process.env.GOOGLE_SCRIPT_URL,
-    TELEGRAM_TOKEN: !!process.env.TELEGRAM_TOKEN,
-    TELEGRAM_CHAT_ID: !!process.env.TELEGRAM_CHAT_ID,
+    ML_APP_ID: !!config.ML_APP_ID,
+    ML_CLIENT_SECRET: !!config.ML_CLIENT_SECRET,
+    ML_REFRESH_TOKEN: !!config.ML_REFRESH_TOKEN,
+    GOOGLE_SCRIPT_URL: !!config.GOOGLE_SCRIPT_URL,
+    TELEGRAM_TOKEN: !!config.TELEGRAM_TOKEN,
+    TELEGRAM_CHAT_ID: !!config.TELEGRAM_CHAT_ID,
+  };
+  results.envSource = {
+    ML_APP_ID: !!process.env.ML_APP_ID ? "env" : config.ML_APP_ID ? "runtime" : "missing",
+    ML_CLIENT_SECRET: !!process.env.ML_CLIENT_SECRET ? "env" : config.ML_CLIENT_SECRET ? "runtime" : "missing",
+    ML_REFRESH_TOKEN: !!process.env.ML_REFRESH_TOKEN ? "env" : config.ML_REFRESH_TOKEN ? "runtime" : "missing",
+    GOOGLE_SCRIPT_URL: !!process.env.GOOGLE_SCRIPT_URL ? "env" : config.GOOGLE_SCRIPT_URL ? "runtime" : "missing",
+    TELEGRAM_TOKEN: !!process.env.TELEGRAM_TOKEN ? "env" : config.TELEGRAM_TOKEN ? "runtime" : "missing",
+    TELEGRAM_CHAT_ID: !!process.env.TELEGRAM_CHAT_ID ? "env" : config.TELEGRAM_CHAT_ID ? "runtime" : "missing",
   };
 
   // 2. Check ML token
