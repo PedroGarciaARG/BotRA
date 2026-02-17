@@ -129,14 +129,11 @@ export async function getOrder(orderId: string) {
 
 /**
  * Get messages for a pack/order.
- * ML messaging API uses /messages/packs/{packId}/sellers/{sellerId} for pack orders
- * and /messages/orders/{orderId}/sellers/{sellerId} for individual orders without pack.
+ * ML docs: "Si el pack_id es null, usar el order_id pero manteniendo la
+ * estructura del endpoint /messages/packs/{id}/sellers/{sellerId}".
+ * The endpoint is ALWAYS /messages/packs/ even when using order_id.
  */
-export async function getPackMessages(packId: string, sellerId: string, isOrderFallback?: boolean) {
-  const basePath = isOrderFallback
-    ? `/messages/orders/${packId}/sellers/${sellerId}?tag=post_sale`
-    : `/messages/packs/${packId}/sellers/${sellerId}?tag=post_sale`;
-
+export async function getPackMessages(packId: string, sellerId: string) {
   try {
     return await mlFetch<{
       messages: Array<{
@@ -147,36 +144,17 @@ export async function getPackMessages(packId: string, sellerId: string, isOrderF
         created_at: string;
       }>;
       paging: { total: number };
-    }>(basePath);
+    }>(`/messages/packs/${packId}/sellers/${sellerId}?tag=post_sale`);
   } catch (err) {
-    // If pack endpoint fails and we haven't tried order endpoint yet, try it as fallback
-    if (!isOrderFallback) {
-      console.log(`[v0] Pack messages failed for ${packId}, trying order fallback`);
-      try {
-        return await mlFetch<{
-          messages: Array<{
-            id: string;
-            from: { user_id: string; role: string };
-            to: { user_id: string; role: string };
-            text: string;
-            created_at: string;
-          }>;
-          paging: { total: number };
-        }>(`/messages/orders/${packId}/sellers/${sellerId}?tag=post_sale`);
-      } catch {
-        // Return empty if both fail
-        console.log(`[v0] Order messages fallback also failed for ${packId}`);
-        return { messages: [], paging: { total: 0 } };
-      }
-    }
-    throw err;
+    console.log(`[v0] getPackMessages failed for packId=${packId}:`, err instanceof Error ? err.message : err);
+    return { messages: [], paging: { total: 0 } };
   }
 }
 
 /**
  * Send a post-sale message to the buyer.
  * ML limit: 350 chars per message (ISO-8859-1).
- * Tries pack endpoint first, falls back to order endpoint.
+ * Endpoint is ALWAYS /messages/packs/ (even when packId is actually an orderId).
  */
 export async function sendMessage(
   packId: string,
@@ -200,25 +178,13 @@ export async function sendMessage(
     messageBody.to = { user_id: Number(buyerId) };
   }
 
-  try {
-    return await mlFetch(
-      `/messages/packs/${packId}/sellers/${sellerId}?tag=post_sale`,
-      {
-        method: "POST",
-        body: messageBody,
-      }
-    );
-  } catch (err) {
-    // Fallback: try order-based endpoint
-    console.log(`[v0] sendMessage pack endpoint failed for ${packId}, trying order endpoint`);
-    return mlFetch(
-      `/messages/orders/${packId}/sellers/${sellerId}?tag=post_sale`,
-      {
-        method: "POST",
-        body: messageBody,
-      }
-    );
-  }
+  return mlFetch(
+    `/messages/packs/${packId}/sellers/${sellerId}?tag=post_sale`,
+    {
+      method: "POST",
+      body: messageBody,
+    }
+  );
 }
 
 /**

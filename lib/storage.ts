@@ -157,21 +157,40 @@ interface RuntimeConfig {
 // These take priority over process.env when set.
 const configOverrides: Partial<RuntimeConfig> = {};
 
-// Keys we track
+// Keys we track, with alternative env var names for Netlify compatibility.
+// Netlify uses MERCADO_LIBRE_* while Vercel uses ML_*.
 const CONFIG_KEYS: (keyof RuntimeConfig)[] = [
   "ML_APP_ID", "ML_CLIENT_SECRET", "ML_REFRESH_TOKEN",
   "TELEGRAM_TOKEN", "TELEGRAM_CHAT_ID", "GOOGLE_SCRIPT_URL",
 ];
 
+const ENV_ALIASES: Record<string, string[]> = {
+  ML_APP_ID: ["ML_APP_ID", "MERCADO_LIBRE_APP_ID"],
+  ML_CLIENT_SECRET: ["ML_CLIENT_SECRET", "MERCADO_LIBRE_CLIENT_SECRET"],
+  ML_REFRESH_TOKEN: ["ML_REFRESH_TOKEN", "MERCADO_LIBRE_REFRESH_TOKEN"],
+  TELEGRAM_TOKEN: ["TELEGRAM_TOKEN"],
+  TELEGRAM_CHAT_ID: ["TELEGRAM_CHAT_ID"],
+  GOOGLE_SCRIPT_URL: ["GOOGLE_SCRIPT_URL"],
+};
+
+function readEnvVar(key: string): string {
+  const aliases = ENV_ALIASES[key] || [key];
+  for (const alias of aliases) {
+    const val = (process.env[alias] || "").trim();
+    if (val) return val;
+  }
+  return "";
+}
+
 /**
  * Read config dynamically: override (dashboard) > process.env > empty.
- * This ensures env var changes are picked up without a server restart.
+ * Supports both ML_* (Vercel) and MERCADO_LIBRE_* (Netlify) env var names.
  */
 export function getConfig(): RuntimeConfig {
   const config = {} as RuntimeConfig;
   for (const key of CONFIG_KEYS) {
     const override = configOverrides[key];
-    const envVal = (process.env[key] || "").trim();
+    const envVal = readEnvVar(key);
     config[key] = (override || envVal || "");
   }
   return config;
