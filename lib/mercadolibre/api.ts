@@ -12,37 +12,54 @@ interface MLApiOptions {
 
 /**
  * Make an authenticated request to the MercadoLibre API.
+ * Includes automatic retry with exponential backoff for rate limiting (429).
  */
 export async function mlFetch<T = unknown>(
   path: string,
   options: MLApiOptions = {}
 ): Promise<T> {
   const { method = "GET", body, skipAuth = false } = options;
+  const MAX_RETRIES = 3;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  };
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
 
-  if (!skipAuth) {
-    const token = await getAccessToken();
-    headers["Authorization"] = `Bearer ${token}`;
+    if (!skipAuth) {
+      const token = await getAccessToken();
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const url = path.startsWith("http") ? path : `${ML_API}${path}`;
+
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    // Handle rate limiting with exponential backoff (ML best practice)
+    if (res.status === 429 && attempt < MAX_RETRIES) {
+      const retryAfter = res.headers.get("Retry-After");
+      const waitMs = retryAfter
+        ? parseInt(retryAfter, 10) * 1000
+        : Math.min(1000 * Math.pow(2, attempt), 8000);
+      console.log(`[v0] ML API rate limited (429), retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`ML API ${method} ${path} failed (${res.status}): ${errText}`);
+    }
+
+    return res.json() as Promise<T>;
   }
 
-  const url = path.startsWith("http") ? path : `${ML_API}${path}`;
-
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`ML API ${method} ${path} failed (${res.status}): ${errText}`);
-  }
-
-  return res.json() as Promise<T>;
+  throw new Error(`ML API ${method} ${path} failed after ${MAX_RETRIES} retries (rate limited)`);
 }
 
 /**

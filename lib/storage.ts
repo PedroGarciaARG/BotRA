@@ -107,8 +107,8 @@ let sellerId: string | null = null;
 // Always seed from env vars on cold start so credentials survive restarts
 function ensureRefreshToken(): string | null {
   if (currentRefreshToken) return currentRefreshToken;
-  // Fall back to runtime config (which reads from env vars)
-  const envToken = runtimeConfig.ML_REFRESH_TOKEN;
+  // Fall back to config (reads env vars dynamically)
+  const envToken = getConfig().ML_REFRESH_TOKEN;
   if (envToken) {
     currentRefreshToken = envToken;
   }
@@ -135,8 +135,8 @@ export function setTokens(
   tokenExpiresAt = Date.now() + expiresIn * 1000;
   if (userId) sellerId = userId;
 
-  // Keep runtimeConfig in sync so getConfig() always returns the latest refresh token
-  runtimeConfig.ML_REFRESH_TOKEN = refreshToken;
+  // Keep overrides in sync so getConfig() always returns the latest refresh token
+  configOverrides.ML_REFRESH_TOKEN = refreshToken;
 }
 
 export function isTokenValid(): boolean {
@@ -153,35 +153,34 @@ interface RuntimeConfig {
   GOOGLE_SCRIPT_URL: string;
 }
 
-// Defaults are used when env vars are not set (e.g. Netlify deploys).
-// Env vars override these defaults when present (e.g. Vercel deploys).
-const DEFAULTS: RuntimeConfig = {
-  ML_APP_ID: "8051674180971751",
-  ML_CLIENT_SECRET: "0p489jUdgA3WcHnkevaO3AZkJzhdRpso",
-  ML_REFRESH_TOKEN: "TG-699217bc16b9db00011a7573-77421292",
-  TELEGRAM_TOKEN: "8505225408:AAE3tl54LKPzipi9VYeKnWEeT9M6QvweYuU",
-  TELEGRAM_CHAT_ID: "1127444354",
-  GOOGLE_SCRIPT_URL:
-    "https://script.google.com/macros/s/AKfycbwPk12BlYqKSS-bLZMM3D9PeT2B5yd5sV0qAxmNuEBWev2ub0-O5GTcTVflmFqfdzcgAg/exec",
-};
+// In-memory overrides (set from dashboard UI via setConfig).
+// These take priority over process.env when set.
+const configOverrides: Partial<RuntimeConfig> = {};
 
-const runtimeConfig: RuntimeConfig = {
-  ML_APP_ID: process.env.ML_APP_ID || DEFAULTS.ML_APP_ID,
-  ML_CLIENT_SECRET: process.env.ML_CLIENT_SECRET || DEFAULTS.ML_CLIENT_SECRET,
-  ML_REFRESH_TOKEN: process.env.ML_REFRESH_TOKEN || DEFAULTS.ML_REFRESH_TOKEN,
-  TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN || DEFAULTS.TELEGRAM_TOKEN,
-  TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || DEFAULTS.TELEGRAM_CHAT_ID,
-  GOOGLE_SCRIPT_URL: process.env.GOOGLE_SCRIPT_URL || DEFAULTS.GOOGLE_SCRIPT_URL,
-};
+// Keys we track
+const CONFIG_KEYS: (keyof RuntimeConfig)[] = [
+  "ML_APP_ID", "ML_CLIENT_SECRET", "ML_REFRESH_TOKEN",
+  "TELEGRAM_TOKEN", "TELEGRAM_CHAT_ID", "GOOGLE_SCRIPT_URL",
+];
 
+/**
+ * Read config dynamically: override (dashboard) > process.env > empty.
+ * This ensures env var changes are picked up without a server restart.
+ */
 export function getConfig(): RuntimeConfig {
-  return { ...runtimeConfig };
+  const config = {} as RuntimeConfig;
+  for (const key of CONFIG_KEYS) {
+    const override = configOverrides[key];
+    const envVal = (process.env[key] || "").trim();
+    config[key] = (override || envVal || "");
+  }
+  return config;
 }
 
 export function setConfig(update: Partial<RuntimeConfig>): void {
   for (const [key, value] of Object.entries(update)) {
-    if (key in runtimeConfig && typeof value === "string") {
-      (runtimeConfig as Record<string, string>)[key] = value;
+    if (CONFIG_KEYS.includes(key as keyof RuntimeConfig) && typeof value === "string") {
+      configOverrides[key as keyof RuntimeConfig] = value.trim();
     }
   }
   // Sync refresh token to token storage if changed

@@ -11,11 +11,7 @@ export interface ProductConfig {
   finalMessage: string[];
 }
 
-const BRAND_FOOTER = `Quedamos a tu disposicion!
-
-*Somos Roblox_Argentina_ok*
-
-Te dejamos nuestro contacto para que puedas agendarnos y aprovechar nuestras promos: *1138201597*`;
+const BRAND_FOOTER = `Quedamos a tu disposicion! Somos Roblox Argentina. Te dejamos nuestro contacto para que puedas agendarnos y aprovechar nuestras promos: 1138201597`;
 
 export const PRODUCTS: ProductConfig[] = [
   {
@@ -24,37 +20,31 @@ export const PRODUCTS: ProductConfig[] = [
     sheetName: "roblox-10",
     keywords: ["roblox", "10", "usd", "dolar"],
     instructions: [
-      `*COMO CANJEAR GIFT CARD ROBLOX 10 USD?*
+      `COMO CANJEAR GIFT CARD ROBLOX 10 USD
 
-*Tene presente que es imprescindible recordar usuario y contrasena!*
-IMPORTANTE: Esta tarjeta NO acredita Robux de manera directa, sino que acredita 10 USD y con ese saldo se compran los Robux.`,
+Tene presente que es imprescindible recordar usuario y contrasena.
+IMPORTANTE: Esta tarjeta NO acredita Robux de manera directa, sino que acredita 10 USD y con ese saldo se compran los Robux.
 
-      `*PASO A PASO:*
-
-1. Ingresa a *www.roblox.com/redeem* (desde un navegador, NO desde la app)
-2. Inicia sesion en tu cuenta (si no te pide iniciar sesion es que ya existe una cuenta abierta, *asegurate que sea la tuya*)
+PASO A PASO:
+1. Ingresa a www.roblox.com/redeem (desde un navegador, NO desde la app)
+2. Inicia sesion en tu cuenta (asegurate que sea la tuya)
 3. Ingresa el codigo
 4. Ya tenes tus 10 USD!`,
 
-      `*UNA VEZ QUE TENES LOS 10 USD CARGADOS:*
+      `UNA VEZ QUE TENES LOS 10 USD CARGADOS:
+5. Anda a: www.roblox.com/premium/membership
+6. Elegi el plan Premium de USD 9.99
+7. Cuando te pide forma de pago, te va a aparecer "Pagar con credito de Roblox"
+8. NO hay que volver a poner el codigo
+9. Completa el e-mail de facturacion
+10. Apreta el boton de SUSCRIBIRSE
 
-5. Anda a: *https://www.roblox.com/premium/membership*
-6. Elegi el plan Premium de *USD 9.99*
-7. Cuando te pide forma de pago, te va a aparecer: *"Pagar con credito de Roblox"*
-8. *NO HAY QUE VOLVER A PONER EL CODIGO*`,
-
-      `9. Completa el e-mail de facturacion
-10. Anda hasta abajo y apreta el boton de *SUSCRIBIRSE*
-
-Estas listo para recibir tu codigo? Responde *"LISTO"* y te lo enviamos.`,
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
     ],
     codeMessage: (code, title) =>
-      `*${title || "Gift Card Roblox 10 USD"}*\n*${code}*\n\n*INSTRUCCIONES RAPIDAS:*\nwww.roblox.com/redeem`,
+      `${title || "Gift Card Roblox 10 USD"}\nTu codigo: ${code}\n\nCanjealo en: www.roblox.com/redeem`,
     finalMessage: [
-      `*Ya tenes tu Gift Card Digital Roblox!* Que la disfrutes!
-
-Te pedimos que en cuanto recibas la tarjeta, *confirmes en ML* para que podamos seguir trabajando!`,
-      BRAND_FOOTER,
+      `Ya tenes tu Gift Card Digital Roblox! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
     ],
   },
   {
@@ -63,22 +53,19 @@ Te pedimos que en cuanto recibas la tarjeta, *confirmes en ML* para que podamos 
     sheetName: "roblox-400",
     keywords: ["roblox", "400", "robux"],
     instructions: [
-      `*COMO CANJEAR GIFT CARD 400 ROBUX?*
+      `COMO CANJEAR GIFT CARD 400 ROBUX
 
-1. Ingresa a *www.roblox.com/redeem* (desde un navegador, NO desde la app)
-2. Inicia sesion en tu cuenta (si no te pide iniciar sesion es que ya existe una cuenta abierta, *asegurate que sea la tuya*)
+1. Ingresa a www.roblox.com/redeem (desde un navegador, NO desde la app)
+2. Inicia sesion en tu cuenta (asegurate que sea la tuya)
 3. Ingresa el codigo
 4. Ya tenes tus Robux!
 
-Estas listo para recibir tu codigo? Responde *"LISTO"* y te lo enviamos.`,
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
     ],
     codeMessage: (code, title) =>
-      `*${title || "Gift Card 400 Robux"}*\n*${code}*\n\n*INSTRUCCIONES RAPIDAS:*\nwww.roblox.com/redeem`,
+      `${title || "Gift Card 400 Robux"}\nTu codigo: ${code}\n\nCanjealo en: www.roblox.com/redeem`,
     finalMessage: [
-      `*Ya tenes tu Gift Card Digital Roblox!* Que la disfrutes!
-
-Te pedimos que en cuanto recibas la tarjeta, *confirmes en ML* para que podamos seguir trabajando!`,
-      BRAND_FOOTER,
+      `Ya tenes tu Gift Card Digital Roblox! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
     ],
   },
   {
@@ -87,22 +74,19 @@ Te pedimos que en cuanto recibas la tarjeta, *confirmes en ML* para que podamos 
     sheetName: "roblox-800",
     keywords: ["roblox", "800", "robux"],
     instructions: [
-      `*COMO CANJEAR GIFT CARD 800 ROBUX?*
+      `COMO CANJEAR GIFT CARD 800 ROBUX
 
-1. Ingresa a *www.roblox.com/redeem* (desde un navegador, NO desde la app)
-2. Inicia sesion en tu cuenta (si no te pide iniciar sesion es que ya existe una cuenta abierta, *asegurate que sea la tuya*)
+1. Ingresa a www.roblox.com/redeem (desde un navegador, NO desde la app)
+2. Inicia sesion en tu cuenta (asegurate que sea la tuya)
 3. Ingresa el codigo
 4. Ya tenes tus Robux!
 
-Estas listo para recibir tu codigo? Responde *"LISTO"* y te lo enviamos.`,
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
     ],
     codeMessage: (code, title) =>
-      `*${title || "Gift Card 800 Robux"}*\n*${code}*\n\n*INSTRUCCIONES RAPIDAS:*\nwww.roblox.com/redeem`,
+      `${title || "Gift Card 800 Robux"}\nTu codigo: ${code}\n\nCanjealo en: www.roblox.com/redeem`,
     finalMessage: [
-      `*Ya tenes tu Gift Card Digital Roblox!* Que la disfrutes!
-
-Te pedimos que en cuanto recibas la tarjeta, *confirmes en ML* para que podamos seguir trabajando!`,
-      BRAND_FOOTER,
+      `Ya tenes tu Gift Card Digital Roblox! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
     ],
   },
   {
@@ -111,22 +95,19 @@ Te pedimos que en cuanto recibas la tarjeta, *confirmes en ML* para que podamos 
     sheetName: "steam-5",
     keywords: ["steam", "5", "usd", "dolar"],
     instructions: [
-      `*COMO CANJEAR GIFT CARD STEAM?*
+      `COMO CANJEAR GIFT CARD STEAM
 
-1. Ingresa a *https://store.steampowered.com/account/redeemwalletcode?l=latam*
+1. Ingresa a store.steampowered.com/account/redeemwalletcode
 2. Inicia sesion en tu cuenta
 3. Ingresa el codigo de la tarjeta
 4. Disfruta tu saldo!
 
-Estas listo para recibir tu codigo? Responde *"LISTO"* y te lo enviamos.`,
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
     ],
     codeMessage: (code, title) =>
-      `*${title || "Gift Card Steam 5 USD"}*\n*${code}*\n\n*INSTRUCCIONES RAPIDAS:*\nhttps://store.steampowered.com/account/redeemwalletcode`,
+      `${title || "Gift Card Steam 5 USD"}\nTu codigo: ${code}\n\nCanjealo en: store.steampowered.com/account/redeemwalletcode`,
     finalMessage: [
-      `*Ya tenes tu Gift Card Steam!* Que la disfrutes!
-
-Te pedimos que en cuanto recibas la tarjeta, *confirmes en ML* para que podamos seguir trabajando!`,
-      BRAND_FOOTER,
+      `Ya tenes tu Gift Card Steam! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
     ],
   },
   {
@@ -135,22 +116,19 @@ Te pedimos que en cuanto recibas la tarjeta, *confirmes en ML* para que podamos 
     sheetName: "steam-10",
     keywords: ["steam", "10", "usd", "dolar"],
     instructions: [
-      `*COMO CANJEAR GIFT CARD STEAM?*
+      `COMO CANJEAR GIFT CARD STEAM
 
-1. Ingresa a *https://store.steampowered.com/account/redeemwalletcode?l=latam*
+1. Ingresa a store.steampowered.com/account/redeemwalletcode
 2. Inicia sesion en tu cuenta
 3. Ingresa el codigo de la tarjeta
 4. Disfruta tu saldo!
 
-Estas listo para recibir tu codigo? Responde *"LISTO"* y te lo enviamos.`,
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
     ],
     codeMessage: (code, title) =>
-      `*${title || "Gift Card Steam 10 USD"}*\n*${code}*\n\n*INSTRUCCIONES RAPIDAS:*\nhttps://store.steampowered.com/account/redeemwalletcode`,
+      `${title || "Gift Card Steam 10 USD"}\nTu codigo: ${code}\n\nCanjealo en: store.steampowered.com/account/redeemwalletcode`,
     finalMessage: [
-      `*Ya tenes tu Gift Card Steam!* Que la disfrutes!
-
-Te pedimos que en cuanto recibas la tarjeta, *confirmes en ML* para que podamos seguir trabajando!`,
-      BRAND_FOOTER,
+      `Ya tenes tu Gift Card Steam! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
     ],
   },
 ];
@@ -181,114 +159,314 @@ export function getProductByKey(key: string): ProductConfig | undefined {
 }
 
 // Initial welcome message (sent when order is paid)
+// Consolidated into a single message to minimize message count (ML best practice)
 export const WELCOME_MESSAGE = [
-  `Gracias por tu compra en *Roblox Argentina*!
+  `Hola! Gracias por tu compra en Roblox Argentina.
 
-Has adquirido una *GIFT CARD VIRTUAL*
-Es 100% digital - No hay envio fisico
-El codigo se entrega INSTANTANEAMENTE por este chat
-El envio es GRATIS por ser digital`,
+Tu Gift Card es 100% digital. El codigo se entrega por este chat de forma instantanea y el envio es gratuito.
 
-  `*Por favor, RESPONDE ESTE MENSAJE con UNA de estas opciones:*
+Por favor responde con una de estas opciones:
+- "SI" para recibir tu codigo ahora
+- "NO" si queres cancelar la compra
+- "HUMANO" si necesitas hablar con una persona
 
-*"SI"* - Confirmar que entendes y queres recibir tu codigo YA
-*"NO"* - Si te arrepentiste y queres cancelar la compra
-*"HUMANO"* - Si necesitas hablar con una persona
-
-*Tu codigo esta listo, solo esperamos tu confirmacion.*`,
+Tu codigo esta listo, solo esperamos tu confirmacion.`,
 ];
 
 // Cancellation instructions
-export const CANCEL_MESSAGE = `Entendemos tu decision.
-
-*Para cancelar la compra:*
-1. Anda a *"Mis Compras"* en Mercado Libre
-2. Selecciona esta compra
-3. Hace click en *"Cancelar compra"*
-
-Una vez cancelado, Mercado Libre te reintegrara el dinero automaticamente.
-
-Si necesitas ayuda con la cancelacion, responde *"AYUDA"* y te asistiremos.`;
+export const CANCEL_MESSAGE = `Entendemos tu decision. Para cancelar la compra anda a "Mis Compras" en Mercado Libre, selecciona esta compra y hace click en "Cancelar compra". ML te reintegrara el dinero automaticamente. Si necesitas ayuda responde "AYUDA".`;
 
 // Human handoff message
-export const HUMAN_MESSAGE = `*Te conectamos con un asesor humano*
-
-Un vendedor te respondera a la brevedad. Mientras tanto, por favor detallanos tu consulta.`;
+export const HUMAN_MESSAGE = `Te conectamos con un asesor humano. Un vendedor te respondera a la brevedad. Mientras tanto, por favor detallanos tu consulta.`;
 
 // Unrecognized response reminder
-export const REMINDER_MESSAGE = `*No entendi tu respuesta*
+export const REMINDER_MESSAGE = `No entendi tu respuesta. Por favor responde con: "SI" para recibir tu codigo, "NO" para cancelar, o "HUMANO" para hablar con una persona.`;
 
-Por favor, responde con UNA de estas opciones:
+// =====================================================================
+// Question response catalog – comprehensive Q&A for all gift cards.
+// Each entry has broad keyword arrays so diverse phrasings still match.
+// Responses always open with "Gracias por tu consulta" and close with
+// "Aguardamos tu compra. Saludos, somos Roblox Argentina."
+// =====================================================================
 
-*"SI"* - Para recibir tu codigo
-*"NO"* - Para cancelar la compra
-*"HUMANO"* - Para hablar con una persona
+const GREETING = "Gracias por tu consulta.";
+const CLOSING = "Aguardamos tu compra. Saludos, somos Roblox Argentina.";
 
-Que opcion elegis?`;
+export const QUESTION_RESPONSES: Array<{
+  keywords: string[];
+  /** Extra condition: question must also contain one of these product hints.
+   *  Leave empty to match any product. */
+  productHints?: string[];
+  response: string;
+}> = [
+  // ---- GENERAL (applies to any product) ----
 
-// Question response templates (for publication questions)
-export const QUESTION_RESPONSES = [
+  // Envio fisico o digital
   {
-    keywords: ["envía", "envia", "gift card", "como llega", "cómo llega"],
-    response:
-      "Gracias por tu consulta. La Gift Card se envia de forma 100% digital a traves del chat de Mercado Libre una vez acreditado el pago. La entrega es instantanea y no se realiza envio fisico. Aguardamos tu compra. Somos Roblox Argentina.",
+    keywords: [
+      "envio fisico", "envío físico", "envio digital", "envío digital",
+      "fisico o digital", "físico o digital", "como llega", "cómo llega",
+      "como lo envian", "cómo lo envían", "es fisico", "es físico",
+      "es digital", "mandan algo", "llega algo", "llega a mi casa",
+      "mandan a domicilio", "es por correo", "viene por correo",
+      "me lo traen", "me llega a casa", "tarjeta fisica", "tarjeta física",
+    ],
+    response: `${GREETING} Es digital. Recibis una tarjeta digital con el codigo por chat privado una vez acreditado el pago. No se realiza envio fisico. ${CLOSING}`,
   },
+
+  // Tiempo de entrega
   {
-    keywords: ["cuánto tarda", "cuanto tarda", "entrega", "demora"],
-    response:
-      "Gracias por tu consulta. La entrega es instantanea una vez que Mercado Libre acredita el pago. Recibiras el codigo por el chat oficial de la compra. Aguardamos tu compra. Somos Roblox Argentina.",
+    keywords: [
+      "cuanto tarda", "cuánto tarda", "cuanto demora", "cuánto demora",
+      "demora", "tarda mucho", "cuando llega", "cuándo llega",
+      "es inmediato", "es instantaneo", "es instantáneo", "en cuanto lo tengo",
+      "rapido", "rápido", "al toque",
+    ],
+    response: `${GREETING} El envio es inmediato luego de acreditado el pago. Recibis el codigo por el chat oficial de la compra. ${CLOSING}`,
   },
+
+  // Costo de envio
   {
-    keywords: ["envío gratis", "envio gratis", "gratis"],
-    response:
-      "Gracias por tu consulta. Si, el envio es totalmente gratuito ya que la entrega es digital e instantanea por el chat de Mercado Libre. Aguardamos tu compra. Somos Roblox Argentina.",
+    keywords: [
+      "costo de envio", "costo de envío", "envio gratis", "envío gratis",
+      "tiene envio", "tiene envío", "cobran envio", "cobran envío",
+      "precio del envio", "cuanto sale el envio", "cuesta el envio",
+      "gratis",
+    ],
+    response: `${GREETING} No tiene costo de envio. El envio es 100% gratuito porque es virtual. ${CLOSING}`,
   },
+
+  // Donde se carga / canjea el codigo
   {
-    keywords: ["tarjeta física", "tarjeta fisica", "envío físico", "envio fisico", "domicilio"],
-    response:
-      "Gracias por tu consulta. No, esta publicacion corresponde a una Gift Card digital con entrega instantanea. No se envia tarjeta fisica por correo. Aguardamos tu compra. Somos Roblox Argentina.",
+    keywords: [
+      "donde se carga", "dónde se carga", "donde se canjea", "dónde se canjea",
+      "como se canjea", "cómo se canjea", "como se carga", "cómo se carga",
+      "como lo uso", "cómo lo uso", "donde lo pongo", "dónde lo pongo",
+      "como redimirlo", "cómo redimirlo", "redeem", "canjear",
+    ],
+    response: `${GREETING} Se canjea en la pagina oficial del juego correspondiente, ingresando con tu usuario y contrasena. Si es Roblox: www.roblox.com/redeem. Si es Steam: store.steampowered.com/account/redeemwalletcode. Te guiamos paso a paso si lo necesitas. ${CLOSING}`,
   },
+
+  // Ayuda a cargar
   {
-    keywords: ["medios de pago", "pagar", "como pago", "cómo pago"],
-    response:
-      "Gracias por tu consulta. Aceptamos todos los medios de pago habilitados por Mercado Libre: tarjeta de credito, debito, transferencia y saldo en cuenta. La entrega es instantanea. Aguardamos tu compra. Somos Roblox Argentina.",
+    keywords: [
+      "me ayudan", "ayudan a cargar", "ayudan a canjear",
+      "me explican", "paso a paso", "no se como", "no sé cómo",
+      "no entiendo", "me guian", "me guían", "asistencia",
+    ],
+    response: `${GREETING} Si, te guiamos paso a paso hasta que quede acreditado correctamente. Una vez realizada la compra, escribinos por el chat y te asistimos. ${CLOSING}`,
   },
+
+  // Comprar para otra cuenta
   {
-    keywords: ["cuotas"],
-    response:
-      "Gracias por tu consulta. Si, si Mercado Libre habilita cuotas con tu tarjeta podras abonar en cuotas sin problema. La entrega es instantanea al acreditarse el pago. Aguardamos tu compra. Somos Roblox Argentina.",
+    keywords: [
+      "otra cuenta", "para mi hijo", "para mi hija", "para otra persona",
+      "para un amigo", "para regalo", "para regalar", "otra persona",
+      "cualquier cuenta", "para otro",
+    ],
+    response: `${GREETING} Si, podes comprar para cualquier cuenta. Solo necesitas saber el usuario al momento de canjear el codigo. ${CLOSING}`,
   },
+
+  // Vigencia del codigo
   {
-    keywords: ["comprobante"],
-    response:
-      "Gracias por tu consulta. No es necesario enviar comprobante. Una vez que Mercado Libre acredita el pago, enviamos el codigo de manera instantanea por el chat. Aguardamos tu compra. Somos Roblox Argentina.",
+    keywords: [
+      "vigencia", "vence", "vencimiento", "expira", "caduca",
+      "cuanto tiempo tengo", "cuánto tiempo tengo", "plazo",
+      "fecha de vencimiento", "cuanto dura", "cuánto dura",
+    ],
+    response: `${GREETING} El codigo tiene 3 meses de vigencia. Si no se canjea en ese plazo, expira. Te recomendamos canjearlo lo antes posible. ${CLOSING}`,
   },
+
+  // Personalizar para regalo
   {
-    keywords: ["seguro comprar", "es seguro", "confiable"],
-    response:
-      "Gracias por tu consulta. Si, la compra es 100% segura y esta protegida por Mercado Libre. El codigo se envia de forma instantanea unicamente por el chat oficial de la plataforma. Aguardamos tu compra. Somos Roblox Argentina.",
+    keywords: [
+      "personalizar", "personalizada", "nombre", "dedicatoria",
+      "con nombre", "tarjeta de regalo", "para regalo personalizado",
+    ],
+    response: `${GREETING} Si, podemos personalizar la tarjeta digital con el nombre que nos indiques. Avisanos luego de la compra por el chat. ${CLOSING}`,
   },
+
+  // Envio a provincia
   {
-    keywords: ["código no funciona", "codigo no funciona", "no funciona", "no me sirve"],
-    response:
-      "Gracias por tu consulta. Todos los codigos se verifican antes de enviarse. En caso de algun inconveniente, podes escribirnos por el chat para ayudarte de inmediato. Aguardamos tu compra. Somos Roblox Argentina.",
+    keywords: [
+      "mi provincia", "interior", "todo el pais", "todo el país",
+      "zona", "llega a", "envian a", "envían a", "cobertura",
+    ],
+    response: `${GREETING} Si, como es digital funciona en todo el pais y no tiene costo adicional. ${CLOSING}`,
   },
+
+  // Medios de pago
   {
-    keywords: ["stock", "disponible", "hay", "tenes", "tienen"],
-    response:
-      "Gracias por tu consulta. Si, tenemos stock disponible. La entrega es digital e instantanea por el chat de Mercado Libre una vez acreditado el pago. Aguardamos tu compra. Somos Roblox Argentina.",
+    keywords: [
+      "medios de pago", "como pago", "cómo pago", "pagar",
+      "tarjeta", "debito", "débito", "credito", "crédito",
+      "transferencia", "efectivo", "aceptan", "formas de pago",
+    ],
+    response: `${GREETING} Aceptamos todos los medios de pago habilitados por Mercado Libre: tarjeta de credito, debito, transferencia y saldo en cuenta. ${CLOSING}`,
+  },
+
+  // Cuotas
+  {
+    keywords: ["cuotas", "en cuotas", "pago en cuotas", "financiacion", "financiación"],
+    response: `${GREETING} Si, si Mercado Libre habilita cuotas con tu tarjeta podras abonar en cuotas sin problema. La entrega es instantanea al acreditarse el pago. ${CLOSING}`,
+  },
+
+  // Seguridad / confiable
+  {
+    keywords: [
+      "seguro", "confiable", "es seguro", "estafa", "trucho",
+      "original", "garantia", "garantía", "proteccion", "protección",
+    ],
+    response: `${GREETING} Si, la compra es 100% segura y esta protegida por Mercado Libre. Todos los codigos se verifican antes de enviarse. ${CLOSING}`,
+  },
+
+  // Codigo no funciona
+  {
+    keywords: [
+      "no funciona", "no me sirve", "codigo invalido", "código inválido",
+      "problema", "error", "no anda", "no me deja",
+    ],
+    response: `${GREETING} Todos los codigos se verifican antes de enviarse. En caso de algun inconveniente, podes escribirnos por el chat para ayudarte de inmediato. ${CLOSING}`,
+  },
+
+  // Stock / disponibilidad
+  {
+    keywords: [
+      "stock", "disponible", "hay", "tenes", "tienen", "queda",
+      "quedan", "disponibilidad", "ultima unidad", "última unidad",
+    ],
+    response: `${GREETING} Si, tenemos stock disponible. La entrega es digital e instantanea por el chat de Mercado Libre una vez acreditado el pago. ${CLOSING}`,
+  },
+
+  // Comprobante
+  {
+    keywords: ["comprobante", "factura", "recibo", "ticket", "boleta"],
+    response: `${GREETING} No es necesario enviar comprobante. Una vez que Mercado Libre acredita el pago, enviamos el codigo de manera instantanea por el chat. ${CLOSING}`,
+  },
+
+  // ---- ROBLOX 400 / 800 ROBUX SPECIFIC ----
+
+  // Item exclusivo 400 Robux
+  {
+    keywords: [
+      "item exclusivo", "ítem exclusivo", "trae item", "incluye item",
+      "viene con item", "item virtual", "accesorio", "objeto exclusivo",
+    ],
+    productHints: ["400"],
+    response: `${GREETING} Las tarjetas de 400 Robux NO incluyen item exclusivo. Los items exclusivos vienen a partir de las tarjetas de 800 Robux. ${CLOSING}`,
+  },
+
+  // Item exclusivo 800 Robux
+  {
+    keywords: [
+      "item exclusivo", "ítem exclusivo", "trae item", "incluye item",
+      "viene con item", "item virtual", "accesorio", "objeto exclusivo",
+    ],
+    productHints: ["800"],
+    response: `${GREETING} Si, la tarjeta de 800 Robux incluye un item exclusivo virtual. Se acredita automaticamente al canjear el codigo en www.roblox.com/redeem. ${CLOSING}`,
+  },
+
+  // ---- ROBLOX 10 USD SPECIFIC ----
+
+  // Cuantos Robux son 10 USD
+  {
+    keywords: [
+      "cuantos robux", "cuántos robux", "robux son", "robux trae",
+      "robux incluye", "equivale a robux", "cuantos dan", "cuántos dan",
+    ],
+    productHints: ["10 usd", "10usd", "10 dolar", "dolar"],
+    response: `${GREETING} La tarjeta acredita 10 USD en tu cuenta. Con ese saldo podes comprar 1000 Robux o contratar Premium y recibir 1000 Robux. No acredita Robux directamente, primero se acreditan 10 USD y luego elegis que comprar. ${CLOSING}`,
+  },
+
+  // Acredita Robux directamente?
+  {
+    keywords: [
+      "acredita robux", "da robux", "carga robux", "robux directo",
+      "robux directamente", "acredita directo",
+    ],
+    productHints: ["10 usd", "10usd", "10 dolar", "dolar"],
+    response: `${GREETING} No, primero se acreditan 10 USD en tu cuenta y luego elegis que comprar: 1000 Robux o el plan Premium. ${CLOSING}`,
+  },
+
+  // Sirve para cualquier pais (Roblox 10 USD)
+  {
+    keywords: [
+      "cualquier pais", "cualquier país", "region", "región",
+      "global", "internacional", "funciona en",
+    ],
+    productHints: ["10 usd", "10usd", "roblox", "dolar"],
+    response: `${GREETING} Si, es region global. Funciona en cualquier parte del mundo sin restricciones. ${CLOSING}`,
+  },
+
+  // Premium Argentina (Roblox 10 USD)
+  {
+    keywords: [
+      "premium", "pagar premium", "suscripcion", "suscripción",
+      "premium argentina", "contratar premium",
+    ],
+    response: `${GREETING} Si, justamente se usa para eso. Cuando la app no permite pagar Premium por region, con la Gift Card de 10 USD podes contratarlo sin problema desde www.roblox.com/premium/membership. ${CLOSING}`,
+  },
+
+  // ---- STEAM SPECIFIC ----
+
+  // Como se canjea Steam
+  {
+    keywords: [
+      "como canjeo", "cómo canjeo", "donde canjeo", "dónde canjeo",
+      "como cargo", "cómo cargo",
+    ],
+    productHints: ["steam"],
+    response: `${GREETING} Ingresa a https://store.steampowered.com/account/redeemwalletcode, inicia sesion en tu cuenta e ingresa el codigo de la tarjeta. Te guiamos paso a paso si lo necesitas. ${CLOSING}`,
+  },
+
+  // Steam recibo / donde llega
+  {
+    keywords: [
+      "donde me llega", "dónde me llega", "por donde", "por dónde",
+      "chat privado", "como recibo", "cómo recibo",
+    ],
+    response: `${GREETING} El codigo te llega por chat privado de Mercado Libre una vez acreditado el pago. ${CLOSING}`,
   },
 ];
 
 /**
  * Find a matching predefined response for a question.
+ * Uses a scoring system: more keyword hits = better match.
+ * Supports productHints to give product-specific answers.
+ * @param itemTitle optional – the ML listing title, used to resolve productHints
  */
-export function findQuestionResponse(questionText: string): string | null {
+export function findQuestionResponse(
+  questionText: string,
+  itemTitle?: string
+): string | null {
   const lower = questionText.toLowerCase();
-  for (const item of QUESTION_RESPONSES) {
-    if (item.keywords.some((kw) => lower.includes(kw))) {
-      return item.response;
+  const titleLower = (itemTitle || "").toLowerCase();
+  const combinedContext = `${lower} ${titleLower}`;
+
+  let bestMatch: (typeof QUESTION_RESPONSES)[number] | null = null;
+  let bestScore = 0;
+
+  for (const entry of QUESTION_RESPONSES) {
+    // Count how many keywords match in the question
+    const keywordHits = entry.keywords.filter((kw) => lower.includes(kw)).length;
+    if (keywordHits === 0) continue;
+
+    // If entry has productHints, at least one must match in question OR item title
+    if (entry.productHints && entry.productHints.length > 0) {
+      const hintMatch = entry.productHints.some((h) => combinedContext.includes(h));
+      if (!hintMatch) continue;
+      // Product-specific matches get a bonus score
+    }
+
+    // Score: keyword hits + bonus for product-specific matches
+    const productBonus = entry.productHints?.length ? 2 : 0;
+    const score = keywordHits + productBonus;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = entry;
     }
   }
-  return null;
+
+  return bestMatch ? bestMatch.response : null;
 }

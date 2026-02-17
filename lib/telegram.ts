@@ -78,6 +78,28 @@ export async function notifyError(context: string, error: string) {
   return sendTelegramMessage(text);
 }
 
+export async function notifyUnhandledQuestion(
+  questionId: string,
+  questionText: string,
+  itemTitle: string,
+  itemId: string
+) {
+  const text = [
+    "PREGUNTA SIN RESPONDER",
+    "",
+    `Pregunta ID: ${questionId}`,
+    `Publicacion: ${itemTitle}`,
+    `Item ID: ${itemId}`,
+    "",
+    `Pregunta: "${questionText}"`,
+    "",
+    "El bot no pudo interpretar esta pregunta.",
+    "Respondela manualmente desde MercadoLibre.",
+  ].join("\n");
+
+  return sendTelegramMessage(text);
+}
+
 export async function notifyNewOrder(
   packId: string,
   productType: string,

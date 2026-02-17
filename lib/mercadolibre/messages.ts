@@ -227,9 +227,15 @@ async function processResponse(
     // Mark code as delivered in the sheet
     await markCodeDelivered(product.sheetName, codeResult.row, orderId);
 
-    // Send final message
-    await new Promise((r) => setTimeout(r, 500));
-    await sendMessages(packId, sellerId, product.finalMessage, buyerId);
+    // Send consolidated final message (single message to avoid spam - ML best practice)
+    await new Promise((r) => setTimeout(r, 800));
+    const finalText = product.finalMessage.join("\n\n");
+    // Respect ML 350 char limit per message
+    if (finalText.length <= 350) {
+      await sendMessage(packId, sellerId, finalText, buyerId);
+    } else {
+      await sendMessages(packId, sellerId, product.finalMessage, buyerId);
+    }
 
     updatePackState(packId, {
       status: "code_sent",

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { handleQuestion } from "@/lib/mercadolibre/questions";
 import { handleOrderNotification } from "@/lib/mercadolibre/orders";
 import { handleMessageNotification } from "@/lib/mercadolibre/messages";
-import { addActivityLog, getBotEnabled } from "@/lib/storage";
+import { addActivityLog, getBotEnabled, getConfig } from "@/lib/storage";
 import { notifyError } from "@/lib/telegram";
 
 export async function POST(req: NextRequest) {
@@ -13,7 +13,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { topic, resource, user_id, application_id } = body;
 
-    console.log(`[v0] Webhook received: topic=${topic}, resource=${resource}`);
+    console.log(`[v0] Webhook received: topic=${topic}, resource=${resource}, app_id=${application_id}`);
+
+    // Validate application_id matches our app (ML security best practice)
+    const myAppId = getConfig().ML_APP_ID;
+    if (myAppId && application_id && String(application_id) !== String(myAppId)) {
+      console.log(`[v0] Ignoring webhook for different app: ${application_id} (ours: ${myAppId})`);
+      return NextResponse.json({ status: "ok", skipped: true });
+    }
 
     // Check if bot is enabled before processing
     if (!getBotEnabled()) {

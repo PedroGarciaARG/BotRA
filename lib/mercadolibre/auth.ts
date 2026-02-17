@@ -35,6 +35,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
   const appId = getAppId();
   const clientSecret = getClientSecret();
 
+  console.log(`[v0] Token refresh attempt: APP_ID=${appId ? appId.slice(0, 6) + "..." : "EMPTY"}, SECRET=${clientSecret ? clientSecret.slice(0, 4) + "..." : "EMPTY"}, REFRESH=${refreshToken ? refreshToken.slice(0, 8) + "..." : "EMPTY"}`);
+
   if (!appId || !clientSecret) {
     throw new Error(
       `Faltan credenciales de ML: APP_ID=${appId ? "OK" : "FALTA"}, CLIENT_SECRET=${clientSecret ? "OK" : "FALTA"}. Configuralas en Vars (sidebar).`
@@ -47,19 +49,42 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
     );
   }
 
+  const params = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: appId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+  });
+
+  console.log(`[v0] Token refresh params: grant_type=refresh_token, client_id=${appId}, refresh_token=${refreshToken.slice(0, 10)}...`);
+
   const res = await fetch(`${ML_API}/oauth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      client_id: appId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-    }),
+    body: params,
   });
 
   if (!res.ok) {
     const errText = await res.text();
+    console.log(`[v0] Token refresh FAILED: status=${res.status}, body=${errText}`);
+
+    // Parse error to give actionable feedback
+    let parsed: { error?: string; message?: string } = {};
+    try { parsed = JSON.parse(errText); } catch { /* ignore */ }
+
+    if (parsed.error === "invalid_client") {
+      throw new Error(
+        `Credenciales de ML invalidas. Verifica que ML_APP_ID (${appId}) y ML_CLIENT_SECRET esten correctos en Vars (sidebar). ` +
+        `Tambien podes re-autenticarte yendo a /api/auth/mercadolibre. Error original: ${errText}`
+      );
+    }
+
+    if (parsed.error === "invalid_grant") {
+      throw new Error(
+        `El refresh token expiro o fue revocado. Necesitas re-autenticarte: ve a /api/auth/mercadolibre para obtener un nuevo token. Error original: ${errText}`
+      );
+    }
+
     throw new Error(`Token refresh failed (${res.status}): ${errText}`);
   }
 

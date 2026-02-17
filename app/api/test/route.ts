@@ -23,13 +23,21 @@ export async function GET() {
     TELEGRAM_TOKEN: !!config.TELEGRAM_TOKEN,
     TELEGRAM_CHAT_ID: !!config.TELEGRAM_CHAT_ID,
   };
+  // Show first chars of credentials for debugging (safe: not full values)
+  results.credentialPreview = {
+    ML_APP_ID: config.ML_APP_ID ? config.ML_APP_ID.slice(0, 8) + "..." : "EMPTY",
+    ML_CLIENT_SECRET: config.ML_CLIENT_SECRET ? config.ML_CLIENT_SECRET.slice(0, 4) + "..." : "EMPTY",
+    ML_REFRESH_TOKEN: config.ML_REFRESH_TOKEN ? config.ML_REFRESH_TOKEN.slice(0, 8) + "..." : "EMPTY",
+    ML_APP_ID_isNumeric: /^\d+$/.test(config.ML_APP_ID),
+    ML_CLIENT_SECRET_isAlpha: /^[a-zA-Z0-9]+$/.test(config.ML_CLIENT_SECRET),
+  };
   results.envSource = {
-    ML_APP_ID: !!process.env.ML_APP_ID ? "env" : config.ML_APP_ID ? "runtime" : "missing",
-    ML_CLIENT_SECRET: !!process.env.ML_CLIENT_SECRET ? "env" : config.ML_CLIENT_SECRET ? "runtime" : "missing",
-    ML_REFRESH_TOKEN: !!process.env.ML_REFRESH_TOKEN ? "env" : config.ML_REFRESH_TOKEN ? "runtime" : "missing",
-    GOOGLE_SCRIPT_URL: !!process.env.GOOGLE_SCRIPT_URL ? "env" : config.GOOGLE_SCRIPT_URL ? "runtime" : "missing",
-    TELEGRAM_TOKEN: !!process.env.TELEGRAM_TOKEN ? "env" : config.TELEGRAM_TOKEN ? "runtime" : "missing",
-    TELEGRAM_CHAT_ID: !!process.env.TELEGRAM_CHAT_ID ? "env" : config.TELEGRAM_CHAT_ID ? "runtime" : "missing",
+    ML_APP_ID: !!process.env.ML_APP_ID ? "env" : config.ML_APP_ID ? "override" : "missing",
+    ML_CLIENT_SECRET: !!process.env.ML_CLIENT_SECRET ? "env" : config.ML_CLIENT_SECRET ? "override" : "missing",
+    ML_REFRESH_TOKEN: !!process.env.ML_REFRESH_TOKEN ? "env" : config.ML_REFRESH_TOKEN ? "override" : "missing",
+    GOOGLE_SCRIPT_URL: !!process.env.GOOGLE_SCRIPT_URL ? "env" : config.GOOGLE_SCRIPT_URL ? "override" : "missing",
+    TELEGRAM_TOKEN: !!process.env.TELEGRAM_TOKEN ? "env" : config.TELEGRAM_TOKEN ? "override" : "missing",
+    TELEGRAM_CHAT_ID: !!process.env.TELEGRAM_CHAT_ID ? "env" : config.TELEGRAM_CHAT_ID ? "override" : "missing",
   };
 
   // 2. Check ML token
