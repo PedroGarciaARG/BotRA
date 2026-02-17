@@ -64,7 +64,7 @@ export function WebhookGuide() {
         setTestResult({
           success: true,
           message: simData.message || "Mensaje enviado correctamente",
-          details: simData.details,
+          details: `${simData.details}\n\nPodes ver la conversacion en la pestana "Chats".`,
         });
       } else {
         setTestResult({

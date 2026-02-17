@@ -153,13 +153,25 @@ interface RuntimeConfig {
   GOOGLE_SCRIPT_URL: string;
 }
 
+// Defaults are used when env vars are not set (e.g. Netlify deploys).
+// Env vars override these defaults when present (e.g. Vercel deploys).
+const DEFAULTS: RuntimeConfig = {
+  ML_APP_ID: "8051674180971751",
+  ML_CLIENT_SECRET: "0p489jUdgA3WcHnkevaO3AZkJzhdRpso",
+  ML_REFRESH_TOKEN: "TG-699217bc16b9db00011a7573-77421292",
+  TELEGRAM_TOKEN: "8505225408:AAE3tl54LKPzipi9VYeKnWEeT9M6QvweYuU",
+  TELEGRAM_CHAT_ID: "1127444354",
+  GOOGLE_SCRIPT_URL:
+    "https://script.google.com/macros/s/AKfycbwPk12BlYqKSS-bLZMM3D9PeT2B5yd5sV0qAxmNuEBWev2ub0-O5GTcTVflmFqfdzcgAg/exec",
+};
+
 const runtimeConfig: RuntimeConfig = {
-  ML_APP_ID: process.env.ML_APP_ID || "",
-  ML_CLIENT_SECRET: process.env.ML_CLIENT_SECRET || "",
-  ML_REFRESH_TOKEN: process.env.ML_REFRESH_TOKEN || "",
-  TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN || "",
-  TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || "",
-  GOOGLE_SCRIPT_URL: process.env.GOOGLE_SCRIPT_URL || "",
+  ML_APP_ID: process.env.ML_APP_ID || DEFAULTS.ML_APP_ID,
+  ML_CLIENT_SECRET: process.env.ML_CLIENT_SECRET || DEFAULTS.ML_CLIENT_SECRET,
+  ML_REFRESH_TOKEN: process.env.ML_REFRESH_TOKEN || DEFAULTS.ML_REFRESH_TOKEN,
+  TELEGRAM_TOKEN: process.env.TELEGRAM_TOKEN || DEFAULTS.TELEGRAM_TOKEN,
+  TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || DEFAULTS.TELEGRAM_CHAT_ID,
+  GOOGLE_SCRIPT_URL: process.env.GOOGLE_SCRIPT_URL || DEFAULTS.GOOGLE_SCRIPT_URL,
 };
 
 export function getConfig(): RuntimeConfig {

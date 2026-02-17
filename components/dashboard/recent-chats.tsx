@@ -21,6 +21,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 interface ChatSummary {
   orderId: number;
   packId: number;
+  hasRealPack: boolean;
   status: string;
   dateCreated: string;
   productTitle: string;
@@ -86,14 +87,17 @@ function statusBadge(status: string) {
 function InlineChatMessages({
   packId,
   sellerId,
+  hasRealPack,
 }: {
   packId: number;
   sellerId: string | null;
+  hasRealPack: boolean;
 }) {
-  const { data, isLoading, error } = useSWR(
-    `/api/chats/${packId}`,
-    fetcher
-  );
+  const chatUrl = hasRealPack
+    ? `/api/chats/${packId}`
+    : `/api/chats/${packId}?type=order`;
+
+  const { data, isLoading, error } = useSWR(chatUrl, fetcher);
 
   const messages: ChatMessage[] = data?.messages || [];
   const resolvedSellerId = sellerId || data?.sellerId || "";
@@ -239,6 +243,7 @@ export function RecentChats() {
                         <InlineChatMessages
                           packId={chat.packId}
                           sellerId={null}
+                          hasRealPack={chat.hasRealPack}
                         />
                       </div>
                     )}

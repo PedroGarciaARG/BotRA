@@ -21,6 +21,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 interface ChatSummary {
   orderId: number;
   packId: number;
+  hasRealPack: boolean;
   status: string;
   dateCreated: string;
   productTitle: string;
@@ -198,10 +199,11 @@ function ChatDetail({
   const [delivering, setDelivering] = useState(false);
   const [delivered, setDelivered] = useState(false);
 
-  const { data, error, isLoading } = useSWR(
-    `/api/chats/${chat.packId}`,
-    fetcher
-  );
+  const chatUrl = chat.hasRealPack
+    ? `/api/chats/${chat.packId}`
+    : `/api/chats/${chat.packId}?type=order`;
+
+  const { data, error, isLoading } = useSWR(chatUrl, fetcher);
 
   const messages: ChatMessage[] = data?.messages || [];
   const sellerId = data?.sellerId || "";

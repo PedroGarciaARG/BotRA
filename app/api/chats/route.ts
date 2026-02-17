@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const chats = data.results.map((order) => ({
       orderId: order.id,
       packId: order.pack_id || order.id, // use order id as fallback pack id
+      hasRealPack: !!order.pack_id, // true if ML assigned a real pack_id
       status: order.status,
       dateCreated: order.date_created,
       productTitle: order.order_items?.[0]?.item?.title || "Producto",

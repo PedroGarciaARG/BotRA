@@ -17,10 +17,10 @@ export async function GET() {
     try {
       await getAccessToken();
       authenticated = true;
+      authError = null;
     } catch (error) {
       authenticated = false;
       authError = error instanceof Error ? error.message : "Error desconocido";
-      console.log("[v0] Auth failed in stats:", authError);
     }
   }
 

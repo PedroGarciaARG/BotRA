@@ -55,12 +55,19 @@ export async function POST() {
     );
 
     const packId = String(latestOrder.pack_id || latestOrder.id);
+    const hasRealPack = !!latestOrder.pack_id;
+
+    console.log(`[v0] Simulation result: action=${result.action}, packId=${packId}, hasRealPack=${hasRealPack}`);
 
     return NextResponse.json({
       success: result.action === "sent",
       action: result.action,
       message: result.message,
-      details: `Order: ${latestOrder.id} | Pack: ${packId} | Seller: ${sellerId} | Buyer: ${latestOrder.buyer.id} | Item: ${itemTitle}`,
+      packId,
+      orderId: latestOrder.id,
+      hasRealPack,
+      buyerNickname: latestOrder.buyer.nickname,
+      details: `Order: ${latestOrder.id} | Pack: ${packId} | hasRealPack: ${hasRealPack} | Seller: ${sellerId} | Buyer: ${latestOrder.buyer.id} | Item: ${itemTitle}`,
     });
   } catch (err) {
     return NextResponse.json({
