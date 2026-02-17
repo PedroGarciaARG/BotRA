@@ -81,6 +81,7 @@ export function CredentialsPanel() {
     {}
   );
   const [setStatus, setSetStatus] = useState<Record<string, boolean>>({});
+  const [sourceStatus, setSourceStatus] = useState<Record<string, string>>({});
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
@@ -96,12 +97,15 @@ export function CredentialsPanel() {
       const data = await res.json();
       const vals: Record<string, string> = {};
       const setFlags: Record<string, boolean> = {};
+      const sources: Record<string, string> = {};
       for (const field of CONFIG_FIELDS) {
         vals[field.key] = data[field.key] || "";
         setFlags[field.key] = data._set?.[field.key] || false;
+        sources[field.key] = data._source?.[field.key] || "missing";
       }
       setCurrentValues(vals);
       setSetStatus(setFlags);
+      setSourceStatus(sources);
     } catch {
       toast.error("No se pudo cargar la configuracion");
     } finally {
@@ -155,6 +159,7 @@ export function CredentialsPanel() {
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         {fields.map((field) => {
           const isSet = setStatus[field.key];
+          const source = sourceStatus[field.key] || "missing";
           const currentMasked = currentValues[field.key];
           const isSecret = field.secret;
           const isRevealed = showSecrets[field.key];
@@ -174,7 +179,7 @@ export function CredentialsPanel() {
                     className="h-4 gap-0.5 px-1 text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                   >
                     <CheckCircle2 className="h-2.5 w-2.5" />
-                    Set
+                    {source === "env" ? "Env" : "Memoria"}
                   </Badge>
                 ) : (
                   <Badge
@@ -184,6 +189,11 @@ export function CredentialsPanel() {
                     <XCircle className="h-2.5 w-2.5" />
                     Falta
                   </Badge>
+                )}
+                {source === "memoria" && isSet && (
+                  <span className="text-[10px] text-amber-400">
+                    (temporal, configurala en Netlify)
+                  </span>
                 )}
               </div>
               <div className="flex items-center gap-2">
@@ -240,10 +250,10 @@ export function CredentialsPanel() {
           Credenciales
         </CardTitle>
         <CardDescription>
-          Credenciales de MercadoLibre, Telegram y Google Sheets. Los valores
-          base se cargan desde las variables de entorno (Vars en el sidebar) y
-          persisten entre deploys. Desde aqui podes sobreescribirlos
-          temporalmente en memoria.
+          Credenciales de MercadoLibre, Telegram y Google Sheets. Se leen desde
+          las variables de entorno del hosting (Netlify, Vercel, etc). Si
+          aparecen como &quot;Falta&quot;, configuralas en tu panel de hosting en
+          Site Settings &gt; Environment Variables.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
@@ -271,9 +281,10 @@ export function CredentialsPanel() {
             </Button>
 
             <p className="text-[11px] text-muted-foreground text-center">
-              Las credenciales se cargan automaticamente desde las variables de
-              entorno (Vars). Solo completa los campos si quieres sobreescribir
-              temporalmente. Para que persistan entre deploys, editalas en Vars.
+              Los cambios desde aqui son temporales (se pierden al reiniciar).
+              Para que persistan, configura las variables de entorno en tu
+              hosting: Netlify (Site Settings &gt; Environment Variables) o
+              Vercel (Settings &gt; Environment Variables).
             </p>
           </>
         )}
