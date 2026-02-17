@@ -1,8 +1,8 @@
 // Handle post-sale message notifications from MercadoLibre.
 // Implements the conversation flow: welcome -> SI -> instructions -> LISTO -> code -> final
 
-import { getPackMessages, sendMessage, sendMessages, getOrderDetails, markShipmentDelivered } from "./api";
-import { getSellerId } from "./auth";
+import { getPackMessages, sendMessage, sendMessages, getOrderDetails, markShipmentDelivered, mlFetch } from "./api";
+import { getAccessToken, getSellerId } from "./auth";
 import {
   detectProductType,
   getProductByKey,
@@ -21,57 +21,201 @@ import {
 import { getAvailableCode, markCodeDelivered } from "@/lib/google-sheets";
 import { notifyHumanRequested, notifyCodeDelivered, notifyError } from "@/lib/telegram";
 
+/**
+ * Fetch a single message by ID to find its associated pack.
+ * ML notification resource is /messages/{messageId}, not /messages/{packId}.
+ */
+async function getMessageById(messageId: string) {
+  try {
+    return await mlFetch<{
+      id: string;
+      resource: string; // e.g. "packs/12345/sellers/67890"
+      from: { user_id: string };
+      to: { user_id: string };
+      text: string;
+      created_at: string;
+    }>(`/messages/${messageId}`);
+  } catch (err) {
+    console.log(`[v0] getMessageById failed for ${messageId}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/**
+ * Reconstruct pack state from ML data when lost due to serverless cold start.
+ * Fetches the order, determines the product, checks existing messages to
+ * figure out which stage of the conversation we're in.
+ */
+async function reconstructStateFromML(
+  packId: string,
+  sellerId: string,
+  buyerId: string
+): Promise<ReturnType<typeof getPackState> | null> {
+  try {
+    // Try to get order info - packId might be an order_id
+    let orderId = packId;
+    let itemTitle = "";
+    let realBuyerId = buyerId;
+
+    try {
+      // First try as order
+      const order = await mlFetch<{
+        id: number;
+        status: string;
+        order_items: Array<{ item: { id: string; title: string } }>;
+        buyer: { id: number; nickname: string };
+        pack_id: number | null;
+      }>(`/orders/${packId}`);
+      itemTitle = order.order_items?.[0]?.item?.title || "";
+      orderId = String(order.id);
+      realBuyerId = String(order.buyer.id);
+    } catch {
+      // packId might be a real pack, try to get orders from pack
+      try {
+        const packData = await mlFetch<{
+          orders: Array<{ id: number }>;
+        }>(`/packs/${packId}`);
+        if (packData.orders?.[0]?.id) {
+          const order = await mlFetch<{
+            id: number;
+            order_items: Array<{ item: { id: string; title: string } }>;
+            buyer: { id: number };
+          }>(`/orders/${packData.orders[0].id}`);
+          itemTitle = order.order_items?.[0]?.item?.title || "";
+          orderId = String(order.id);
+          realBuyerId = String(order.buyer.id);
+        }
+      } catch {
+        console.log(`[v0] Could not fetch pack or order for ${packId}`);
+      }
+    }
+
+    const product = detectProductType(itemTitle);
+    if (!product && !itemTitle) {
+      console.log(`[v0] No product detected for reconstruction, title="${itemTitle}"`);
+      return null;
+    }
+
+    // Check existing messages to determine conversation status
+    const msgsData = await getPackMessages(packId, sellerId);
+    const messages = msgsData.messages || [];
+
+    const sellerMsgs = messages.filter(m => String(m.from.user_id) === String(sellerId));
+    const buyerMsgs = messages.filter(m => String(m.from.user_id) !== String(sellerId));
+
+    // Determine status based on message count and content
+    let status = "initial_sent";
+    if (sellerMsgs.length === 0) {
+      status = "initial_sent"; // Welcome should have been sent by order handler
+    } else if (sellerMsgs.length === 1) {
+      status = "initial_sent"; // Only welcome sent
+    } else if (sellerMsgs.length >= 2) {
+      // Check if code was delivered (look for "Tu codigo:" in seller messages)
+      const codeDelivered = sellerMsgs.some(m => 
+        m.text.toLowerCase().includes("tu codigo:") || m.text.toLowerCase().includes("tu código:")
+      );
+      if (codeDelivered) {
+        status = "code_sent";
+      } else {
+        // Instructions were sent
+        status = "instructions_sent";
+      }
+    }
+
+    console.log(`[v0] Reconstructed: product=${product?.key || "unknown"}, status=${status}, sellerMsgs=${sellerMsgs.length}, buyerMsgs=${buyerMsgs.length}`);
+
+    const newState = {
+      packId,
+      orderId,
+      sellerId,
+      buyerId: realBuyerId,
+      productType: product?.key || "unknown",
+      productTitle: itemTitle,
+      status,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setPackState(packId, newState);
+    return newState;
+  } catch (err) {
+    console.log(`[v0] reconstructStateFromML error:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 export async function handleMessageNotification(
   resource: string,
   userId: string
 ): Promise<void> {
-  // resource format: messages can come as various paths
-  // We need to extract the pack ID from the resource or message itself
+  // CRITICAL: On serverless (Netlify), sellerId is lost on each cold start.
+  await getAccessToken();
   const sellerId = getSellerId();
   if (!sellerId) {
-    throw new Error("Seller ID not available");
+    throw new Error("Seller ID not available after auth");
   }
 
-  // Resource is typically like /messages/{messageId} but we need to find the pack
-  // The notification body contains user_id which helps us identify messages
-  // We'll need to check existing packs for this user or find from message details
+  // ML sends: { resource: "/messages/{messageId}", ... }
+  // We need to GET that message first to find the pack_id
+  const messageId = resource.replace("/messages/", "").split("/")[0];
+  console.log(`[v0] handleMessageNotification: messageId=${messageId}, userId=${userId}`);
 
-  // Try to extract pack info from the resource path
-  // ML sends notifications like: { resource: "/messages/PACK_ID", ... }
-  const resourceParts = resource.replace("/messages/", "").split("/");
-  let packId = resourceParts[0];
+  let packId: string | null = null;
 
-  // If we can't find the pack directly, check all known packs
+  // Strategy 1: GET the message to find the pack from its "resource" field
+  const messageDetail = await getMessageById(messageId);
+  if (messageDetail) {
+    // message.resource is like "packs/12345/sellers/67890"
+    const packMatch = (messageDetail.resource || "").match(/packs\/(\d+)/);
+    if (packMatch) {
+      packId = packMatch[1];
+      console.log(`[v0] Found packId=${packId} from message resource`);
+    }
+
+    // If the message is FROM the seller (us), skip - we don't respond to ourselves
+    if (String(messageDetail.from?.user_id) === String(sellerId)) {
+      console.log(`[v0] Message is from seller, skipping`);
+      return;
+    }
+  }
+
+  // Strategy 2: Try using the messageId directly as packId (legacy behavior)
+  if (!packId) {
+    packId = messageId;
+    console.log(`[v0] Using messageId as packId fallback: ${packId}`);
+  }
+
+  // Find state for this pack
   let state = getPackState(packId);
 
   if (!state) {
-    // Try to find the pack by checking all states for this buyer
+    // Strategy 3: Search all known states for matching buyer or packId
     const allStates = getAllPackStates();
     for (const s of allStates) {
       if (s.buyerId === userId || s.packId === packId) {
         state = s;
         packId = s.packId;
+        console.log(`[v0] Found state via search: packId=${packId}`);
         break;
       }
     }
   }
 
   if (!state) {
-    console.log(`[v0] No state found for pack ${packId}, fetching messages to bootstrap`);
-    // Try to bootstrap state from messages
-    try {
-      const msgs = await getPackMessages(packId, sellerId);
-      if (!msgs.messages || msgs.messages.length === 0) {
-        console.log(`[v0] No messages found for pack ${packId}`);
-        return;
-      }
-      // We don't know the product type yet, so we can't fully bootstrap
-      // Just log and return - the order webhook should handle initial setup
-      return;
-    } catch {
-      console.log(`[v0] Could not fetch messages for pack ${packId}`);
+    console.log(`[v0] No state found for pack ${packId}, trying to reconstruct from ML`);
+    // On serverless, packStates are always empty on cold start.
+    // Reconstruct state by fetching the order associated with this pack.
+    state = await reconstructStateFromML(packId, sellerId, userId);
+    if (!state) {
+      console.log(`[v0] Could not reconstruct state for pack ${packId}`);
+      addActivityLog({
+        type: "message",
+        message: `Mensaje recibido sin estado previo`,
+        details: `Pack: ${packId} | Buyer: ${userId}`,
+      });
       return;
     }
+    console.log(`[v0] Reconstructed state for pack ${packId}: status=${state.status}, product=${state.productType}`);
   }
 
   // Fetch messages for this pack

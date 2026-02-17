@@ -152,6 +152,73 @@ export async function getPackMessages(packId: string, sellerId: string) {
 }
 
 /**
+ * Get available conversation options for a pack (action_guide).
+ * ML requires sellers to choose a "motivo" before sending the first message
+ * when using Mercado Envios 2 (Fulfillment, Cross docking, Drop off, Flex).
+ */
+export async function getActionGuide(packId: string) {
+  try {
+    return await mlFetch<{
+      options: Array<{
+        id: string;
+        internal_description?: string;
+        template_id?: string;
+      }>;
+    }>(`/messages/action_guide/packs/${packId}?tag=post_sale`);
+  } catch (err) {
+    console.log(`[v0] getActionGuide failed for pack ${packId}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/**
+ * Initialize a post-sale conversation by selecting the "OTHER" option.
+ * This is required by ML before sending free-form messages.
+ * Returns true if successful or if action_guide is not required.
+ */
+export async function initConversation(packId: string, text: string): Promise<boolean> {
+  try {
+    const guide = await getActionGuide(packId);
+    if (!guide || !guide.options || guide.options.length === 0) {
+      // action_guide not required for this pack (e.g. "acordar con el vendedor")
+      console.log(`[v0] No action_guide required for pack ${packId}`);
+      return true;
+    }
+
+    // Prefer "OTHER" option for free-form text
+    const otherOption = guide.options.find(o => o.id === "OTHER");
+    const optionId = otherOption?.id || guide.options[0]?.id;
+
+    if (!optionId) {
+      console.log(`[v0] No valid option found in action_guide for pack ${packId}`);
+      return true; // proceed anyway
+    }
+
+    console.log(`[v0] Initializing conversation for pack ${packId} with option=${optionId}`);
+
+    const body: Record<string, unknown> = {
+      option_id: optionId,
+    };
+    // For "OTHER" we can include text directly
+    if (optionId === "OTHER") {
+      body.text = text.slice(0, 350);
+    }
+
+    await mlFetch(
+      `/messages/action_guide/packs/${packId}/option?tag=post_sale`,
+      { method: "POST", body }
+    );
+
+    console.log(`[v0] Conversation initialized for pack ${packId}`);
+    return true;
+  } catch (err) {
+    console.log(`[v0] initConversation failed for pack ${packId}:`, err instanceof Error ? err.message : err);
+    // Don't fail the whole flow - try sending directly
+    return false;
+  }
+}
+
+/**
  * Send a post-sale message to the buyer.
  * ML limit: 350 chars per message (ISO-8859-1).
  * Endpoint is ALWAYS /messages/packs/ (even when packId is actually an orderId).
