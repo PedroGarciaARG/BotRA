@@ -59,14 +59,46 @@ export async function POST(req: NextRequest) {
       }
 
       case "orders_v2": {
-        const result = await handleOrderNotification(resource);
-        console.log(`[v0] Order result: action=${result.action}, message=${result.message}`);
+        console.log(`[v0] Processing order: ${resource}`);
+        try {
+          const result = await handleOrderNotification(resource);
+          console.log(`[v0] Order result: action=${result.action}, message=${result.message}`);
+          if (result.action === "error") {
+            addActivityLog({
+              type: "error",
+              message: `Error en orden: ${result.message.slice(0, 120)}`,
+              details: resource,
+            });
+            await notifyError("order", result.message).catch(() => {});
+          }
+        } catch (oErr) {
+          const oMsg = oErr instanceof Error ? oErr.message : String(oErr);
+          console.log(`[v0] Order handling FAILED: ${oMsg}`);
+          addActivityLog({
+            type: "error",
+            message: `Error procesando orden: ${oMsg.slice(0, 120)}`,
+            details: resource,
+          });
+          await notifyError("order", oMsg).catch(() => {});
+        }
         break;
       }
 
       case "messages": {
-        console.log(`[v0] Processing messages: ${resource} for user ${user_id}`);
-        await handleMessageNotification(resource, String(user_id));
+        console.log(`[v0] Processing message: ${resource} for user ${user_id}`);
+        try {
+          await handleMessageNotification(resource, String(user_id));
+          console.log(`[v0] Message processed successfully`);
+        } catch (mErr) {
+          const mMsg = mErr instanceof Error ? mErr.message : String(mErr);
+          console.log(`[v0] Message handling FAILED: ${mMsg}`);
+          addActivityLog({
+            type: "error",
+            message: `Error procesando mensaje: ${mMsg.slice(0, 120)}`,
+            details: resource,
+          });
+          await notifyError("message", mMsg).catch(() => {});
+        }
         break;
       }
 
