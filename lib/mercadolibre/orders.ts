@@ -7,35 +7,47 @@ import { detectProductType, WELCOME_MESSAGE } from "@/lib/product-config";
 import { getPackState, setPackState, addActivityLog } from "@/lib/storage";
 import { notifyNewOrder, notifyError } from "@/lib/telegram";
 
-export async function handleOrderNotification(resource: string): Promise<void> {
-  // resource is like "/orders/ORDER_ID"
+export interface OrderResult {
+  action: "sent" | "skipped_tracked" | "skipped_exists" | "skipped_unpaid" | "skipped_unknown_product" | "error";
+  message: string;
+  packId?: string;
+  orderId?: string;
+}
+
+export async function handleOrderNotification(
+  resource: string,
+  options?: { force?: boolean }
+): Promise<OrderResult> {
   const orderId = resource.replace("/orders/", "");
   const sellerId = getSellerId();
 
   if (!sellerId) {
-    throw new Error("Seller ID not available. Authenticate first.");
+    return { action: "error", message: "Seller ID not available. Authenticate first.", orderId };
   }
 
-  const order = await getOrder(orderId);
+  let order;
+  try {
+    order = await getOrder(orderId);
+  } catch (err) {
+    return {
+      action: "error",
+      message: `No se pudo obtener la orden: ${err instanceof Error ? err.message : "unknown"}`,
+      orderId,
+    };
+  }
 
-  // Only process paid orders
   if (order.status !== "paid") {
-    console.log(`[v0] Order ${orderId} status is ${order.status}, skipping`);
-    return;
+    return {
+      action: "skipped_unpaid",
+      message: `Orden ${orderId} status=${order.status}, no es paid`,
+      orderId,
+    };
   }
 
-  // Get or create pack ID (ML groups orders in packs)
   const packId = String(order.pack_id || order.id);
-
-  // Skip if we already handled this pack
-  if (getPackState(packId)) {
-    console.log(`[v0] Pack ${packId} already tracked, skipping`);
-    return;
-  }
-
-  // Detect product type from item title
   const itemTitle = order.order_items?.[0]?.item?.title || "";
   const product = detectProductType(itemTitle);
+  const buyerId = String(order.buyer.id);
 
   if (!product) {
     addActivityLog({
@@ -44,49 +56,86 @@ export async function handleOrderNotification(resource: string): Promise<void> {
       details: `Order: ${orderId}`,
     });
     await notifyError("order", `Producto no reconocido: ${itemTitle}`);
-    return;
+    return {
+      action: "skipped_unknown_product",
+      message: `Producto no reconocido: "${itemTitle}"`,
+      packId,
+      orderId,
+    };
   }
 
-  // Check if we already sent messages to this pack (in case of restart)
-  try {
-    const existingMessages = await getPackMessages(packId, sellerId);
-    const sellerMessages = existingMessages.messages?.filter(
-      (m) => m.from.user_id === sellerId
-    );
-    if (sellerMessages && sellerMessages.length > 0) {
-      console.log(`[v0] Pack ${packId} already has seller messages, reconstructing state`);
-      setPackState(packId, {
-        packId,
-        orderId,
-        sellerId,
-        buyerId: String(order.buyer.id),
-        productType: product.key,
-        productTitle: itemTitle,
-        status: "initial_sent",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      return;
+  // Skip if already tracked (unless force=true for simulation)
+  if (!options?.force && getPackState(packId)) {
+    return {
+      action: "skipped_tracked",
+      message: `Pack ${packId} ya estaba trackeado en memoria`,
+      packId,
+      orderId,
+    };
+  }
+
+  // Check if ML already has seller messages for this pack (in case of restart)
+  if (!options?.force) {
+    try {
+      const existingMessages = await getPackMessages(packId, sellerId);
+      const allMessages = existingMessages.messages || [];
+      const sellerMessages = allMessages.filter(
+        (m) => String(m.from.user_id) === String(sellerId)
+      );
+      if (sellerMessages.length > 0) {
+        // Reconstruct state only - don't re-send
+        setPackState(packId, {
+          packId,
+          orderId,
+          sellerId,
+          buyerId,
+          productType: product.key,
+          productTitle: itemTitle,
+          status: "initial_sent",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        addActivityLog({
+          type: "order",
+          message: `Orden reconstruida: ${product.label}`,
+          details: `Pack: ${packId} | Ya tenia ${sellerMessages.length} mensaje(s) del vendedor`,
+        });
+        return {
+          action: "skipped_exists",
+          message: `Pack ${packId} ya tenia ${sellerMessages.length} mensaje(s) del vendedor en ML. Estado reconstruido.`,
+          packId,
+          orderId,
+        };
+      }
+    } catch {
+      // If we can't check messages, proceed with sending
     }
-  } catch {
-    // If we can't check messages, proceed with sending
   }
 
-  // Save state
+  // Send welcome message
+  try {
+    await sendMessages(packId, sellerId, WELCOME_MESSAGE, buyerId);
+  } catch (sendErr) {
+    return {
+      action: "error",
+      message: `Error enviando mensaje: ${sendErr instanceof Error ? sendErr.message : "unknown"}`,
+      packId,
+      orderId,
+    };
+  }
+
+  // Save state only after message was sent successfully
   setPackState(packId, {
     packId,
     orderId,
     sellerId,
-    buyerId: String(order.buyer.id),
+    buyerId,
     productType: product.key,
     productTitle: itemTitle,
     status: "initial_sent",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
-
-  // Send welcome message
-  await sendMessages(packId, sellerId, WELCOME_MESSAGE);
 
   addActivityLog({
     type: "order",
@@ -95,4 +144,11 @@ export async function handleOrderNotification(resource: string): Promise<void> {
   });
 
   await notifyNewOrder(packId, product.label, order.buyer.nickname);
+
+  return {
+    action: "sent",
+    message: `Mensaje de bienvenida enviado a ${order.buyer.nickname} para ${product.label}`,
+    packId,
+    orderId,
+  };
 }

@@ -123,7 +123,7 @@ async function processResponse(
   normalizedText: string,
   originalText: string
 ): Promise<void> {
-  const { sellerId, productType, orderId } = state;
+  const { sellerId, productType, orderId, buyerId } = state;
 
   // Already delivered code - don't process further automatic messages
   if (state.status === "code_sent") {
@@ -133,7 +133,7 @@ async function processResponse(
       normalizedText.includes("persona") ||
       normalizedText.includes("ayuda")
     ) {
-      await sendMessage(packId, sellerId, HUMAN_MESSAGE);
+      await sendMessage(packId, sellerId, HUMAN_MESSAGE, buyerId);
       updatePackState(packId, { status: "human_requested" });
       await notifyHumanRequested(packId, originalText);
       addActivityLog({
@@ -167,11 +167,11 @@ async function processResponse(
   ) {
     const product = getProductByKey(productType);
     if (!product) {
-      await sendMessage(packId, sellerId, REMINDER_MESSAGE);
+      await sendMessage(packId, sellerId, REMINDER_MESSAGE, buyerId);
       return;
     }
 
-    await sendMessages(packId, sellerId, product.instructions);
+    await sendMessages(packId, sellerId, product.instructions, buyerId);
     updatePackState(packId, { status: "instructions_sent" });
 
     addActivityLog({
@@ -204,7 +204,8 @@ async function processResponse(
       await sendMessage(
         packId,
         sellerId,
-        "Estamos preparando tu codigo. Un asesor te lo enviara en breve."
+        "Estamos preparando tu codigo. Un asesor te lo enviara en breve.",
+        buyerId
       );
       updatePackState(packId, { status: "human_requested" });
       await notifyError(
@@ -221,14 +222,14 @@ async function processResponse(
 
     // Send code with product-specific format
     const codeMessage = product.codeMessage(codeResult.code, state.productTitle);
-    await sendMessage(packId, sellerId, codeMessage);
+    await sendMessage(packId, sellerId, codeMessage, buyerId);
 
     // Mark code as delivered in the sheet
     await markCodeDelivered(product.sheetName, codeResult.row, orderId);
 
     // Send final message
     await new Promise((r) => setTimeout(r, 500));
-    await sendMessages(packId, sellerId, product.finalMessage);
+    await sendMessages(packId, sellerId, product.finalMessage, buyerId);
 
     updatePackState(packId, {
       status: "code_sent",
@@ -271,7 +272,7 @@ async function processResponse(
     normalizedText.startsWith("no ") ||
     normalizedText.includes("cancelar")
   ) {
-    await sendMessage(packId, sellerId, CANCEL_MESSAGE);
+    await sendMessage(packId, sellerId, CANCEL_MESSAGE, buyerId);
     updatePackState(packId, { status: "cancelled" });
 
     addActivityLog({
@@ -289,7 +290,7 @@ async function processResponse(
     normalizedText.includes("atencion") ||
     normalizedText.includes("ayuda")
   ) {
-    await sendMessage(packId, sellerId, HUMAN_MESSAGE);
+    await sendMessage(packId, sellerId, HUMAN_MESSAGE, buyerId);
     updatePackState(packId, { status: "human_requested" });
 
     await notifyHumanRequested(packId, originalText);
@@ -302,7 +303,7 @@ async function processResponse(
   }
 
   // ---- Unrecognized ----
-  await sendMessage(packId, sellerId, REMINDER_MESSAGE);
+  await sendMessage(packId, sellerId, REMINDER_MESSAGE, buyerId);
 
   addActivityLog({
     type: "message",

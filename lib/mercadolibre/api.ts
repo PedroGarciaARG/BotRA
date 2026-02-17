@@ -133,16 +133,30 @@ export async function getPackMessages(packId: string, sellerId: string) {
 export async function sendMessage(
   packId: string,
   sellerId: string,
-  text: string
+  text: string,
+  buyerId?: string
 ) {
   // Truncate to 350 chars to respect ML limit
   const truncated = text.slice(0, 350);
+
+  // ML messaging API requires from.user_id as a number
+  const numericSellerId = Number(sellerId);
+
+  const messageBody: Record<string, unknown> = {
+    from: { user_id: numericSellerId },
+    text: truncated,
+  };
+
+  // Include buyer ID if available
+  if (buyerId) {
+    messageBody.to = { user_id: Number(buyerId) };
+  }
 
   return mlFetch(
     `/messages/packs/${packId}/sellers/${sellerId}?tag=post_sale`,
     {
       method: "POST",
-      body: { text: truncated },
+      body: messageBody,
     }
   );
 }
@@ -154,10 +168,11 @@ export async function sendMessage(
 export async function sendMessages(
   packId: string,
   sellerId: string,
-  messages: string[]
+  messages: string[],
+  buyerId?: string
 ) {
   for (let i = 0; i < messages.length; i++) {
-    await sendMessage(packId, sellerId, messages[i]);
+    await sendMessage(packId, sellerId, messages[i], buyerId);
     if (i < messages.length - 1) {
       await new Promise((r) => setTimeout(r, 500));
     }

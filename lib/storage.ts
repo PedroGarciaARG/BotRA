@@ -52,6 +52,10 @@ export function updatePackState(
   }
 }
 
+export function clearPackState(packId: string): void {
+  packStates.delete(packId);
+}
+
 export function getAllPackStates(): PackState[] {
   return Array.from(packStates.values());
 }
@@ -94,17 +98,27 @@ export function getStats() {
   };
 }
 
-// -- Token Storage (in-memory, refreshed on restart) --
+// -- Token Storage (in-memory, seeded from env vars on cold start) --
 let currentAccessToken: string | null = null;
-let currentRefreshToken: string | null =
-  process.env.ML_REFRESH_TOKEN || null;
+let currentRefreshToken: string | null = null;
 let tokenExpiresAt: number = 0;
 let sellerId: string | null = null;
+
+// Always seed from env vars on cold start so credentials survive restarts
+function ensureRefreshToken(): string | null {
+  if (currentRefreshToken) return currentRefreshToken;
+  // Fall back to runtime config (which reads from env vars)
+  const envToken = runtimeConfig.ML_REFRESH_TOKEN;
+  if (envToken) {
+    currentRefreshToken = envToken;
+  }
+  return currentRefreshToken;
+}
 
 export function getTokens() {
   return {
     accessToken: currentAccessToken,
-    refreshToken: currentRefreshToken,
+    refreshToken: ensureRefreshToken(),
     expiresAt: tokenExpiresAt,
     sellerId,
   };
@@ -120,6 +134,9 @@ export function setTokens(
   currentRefreshToken = refreshToken;
   tokenExpiresAt = Date.now() + expiresIn * 1000;
   if (userId) sellerId = userId;
+
+  // Keep runtimeConfig in sync so getConfig() always returns the latest refresh token
+  runtimeConfig.ML_REFRESH_TOKEN = refreshToken;
 }
 
 export function isTokenValid(): boolean {

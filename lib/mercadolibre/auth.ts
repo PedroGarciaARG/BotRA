@@ -32,13 +32,28 @@ export async function getAccessToken(): Promise<string> {
  * Refresh the access token using a refresh token.
  */
 export async function refreshAccessToken(refreshToken: string): Promise<string> {
+  const appId = getAppId();
+  const clientSecret = getClientSecret();
+
+  if (!appId || !clientSecret) {
+    throw new Error(
+      `Faltan credenciales de ML: APP_ID=${appId ? "OK" : "FALTA"}, CLIENT_SECRET=${clientSecret ? "OK" : "FALTA"}. Configuralas en Vars (sidebar).`
+    );
+  }
+
+  if (!refreshToken) {
+    throw new Error(
+      "No hay refresh token. Configuralo en Vars (sidebar) como ML_REFRESH_TOKEN."
+    );
+  }
+
   const res = await fetch(`${ML_API}/oauth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      client_id: getAppId(),
-      client_secret: getClientSecret(),
+      client_id: appId,
+      client_secret: clientSecret,
       refresh_token: refreshToken,
     }),
   });
