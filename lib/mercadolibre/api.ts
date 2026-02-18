@@ -128,6 +128,35 @@ export async function getOrder(orderId: string) {
 }
 
 /**
+ * Get a single message by its resource path from a webhook notification.
+ * ML webhook sends resource like "/messages-mp-v2/123456" or "/messages/123456"
+ * which can be fetched directly to get the message with pack_id info.
+ */
+export async function getMessageByResource(resource: string) {
+  try {
+    const data = await mlFetch<{
+      id?: string;
+      message_id?: string;
+      from?: { user_id: number | string };
+      to?: { user_id: number | string };
+      text?: string;
+      resource?: string;
+      // The pack or conversation reference
+      conversation_id?: { pack_id?: string; order_id?: string };
+      // Some formats use message_resources
+      message_resources?: Array<{
+        id: string;
+        name: string;
+      }>;
+    }>(resource);
+    return data;
+  } catch (err) {
+    console.log(`[v0] getMessageByResource failed for ${resource}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/**
  * Get messages for a pack/order.
  * ML docs: "Si el pack_id es null, usar el order_id pero manteniendo la
  * estructura del endpoint /messages/packs/{id}/sellers/{sellerId}".

@@ -2,7 +2,7 @@
 // NEW FLOW: Bot waits for buyer's first message, then sends welcome + instructions.
 // Flow: buyer msg -> welcome+instructions -> buyer "LISTO" -> code -> final
 
-import { getPackMessages, sendMessage, getSellerOrders, getOrderDetails, markShipmentDelivered, initConversation } from "./api";
+import { getPackMessages, sendMessage, getSellerOrders, getOrderDetails, markShipmentDelivered, initConversation, getMessageByResource } from "./api";
 import { getAccessToken, getSellerId } from "./auth";
 import {
   detectProductType,
@@ -95,7 +95,7 @@ async function safeSendMessages(packId: string, sellerId: string, messages: stri
 /**
  * Find the order/pack associated with a buyer by searching recent seller orders.
  */
-async function findOrderForBuyer(sellerId: string, buyerUserId: string): Promise<{
+async function findOrderForBuyer(sellerId: string, buyerUserId: string, searchLimit: number = 20): Promise<{
   packId: string;
   orderId: string;
   buyerId: string;
@@ -103,8 +103,9 @@ async function findOrderForBuyer(sellerId: string, buyerUserId: string): Promise
   productTitle: string;
 } | null> {
   try {
-    const ordersData = await getSellerOrders(sellerId, 20, 0);
+    const ordersData = await getSellerOrders(sellerId, searchLimit, 0);
     const orders = ordersData.results || [];
+    console.log(`[v0] findOrderForBuyer: searching ${orders.length} orders for buyer ${buyerUserId}`);
 
     for (const order of orders) {
       if (String(order.buyer.id) === String(buyerUserId) && order.status === "paid") {
@@ -186,17 +187,98 @@ export async function handleMessageNotification(
     return;
   }
 
-  // userId = the buyer who sent the message.
-  // Find their recent order to get the packId and product.
-  const orderInfo = await findOrderForBuyer(sellerId, userId);
+  // STRATEGY 1: Try to get pack_id directly from the message resource.
+  // ML webhook sends resource like "/messages-mp-v2/{id}" which contains conversation info.
+  let packIdFromResource: string | null = null;
+  let buyerIdFromResource: string | null = null;
+
+  try {
+    const msgData = await getMessageByResource(resource);
+    console.log(`[v0] Message resource data:`, JSON.stringify(msgData).slice(0, 500));
+    if (msgData) {
+      // Try extracting pack_id from various response formats
+      const convId = (msgData as Record<string, unknown>).conversation_id as Record<string, unknown> | undefined;
+      if (convId?.pack_id) {
+        packIdFromResource = String(convId.pack_id);
+      } else if (convId?.order_id) {
+        packIdFromResource = String(convId.order_id);
+      }
+      // Also try top-level fields
+      const raw = msgData as Record<string, unknown>;
+      if (!packIdFromResource && raw.pack_id) {
+        packIdFromResource = String(raw.pack_id);
+      }
+      if (!packIdFromResource && raw.resource_id) {
+        packIdFromResource = String(raw.resource_id);
+      }
+      // Get buyer from message sender
+      if (raw.from && typeof raw.from === "object") {
+        const from = raw.from as Record<string, unknown>;
+        if (from.user_id && String(from.user_id) !== String(sellerId)) {
+          buyerIdFromResource = String(from.user_id);
+        }
+      }
+    }
+  } catch (err) {
+    console.log(`[v0] Could not fetch message resource: ${err instanceof Error ? err.message : err}`);
+  }
+
+  console.log(`[v0] From resource: packId=${packIdFromResource}, buyerId=${buyerIdFromResource}`);
+
+  // STRATEGY 2: If no pack from resource, find via buyer's recent orders (fallback).
+  let orderInfo: {
+    packId: string;
+    orderId: string;
+    buyerId: string;
+    productType: string;
+    productTitle: string;
+  } | null = null;
+
+  if (packIdFromResource) {
+    // We have a packId from the resource, now find the matching order to get product info
+    const buyerToSearch = buyerIdFromResource || userId;
+    orderInfo = await findOrderForBuyer(sellerId, buyerToSearch);
+    if (orderInfo) {
+      // Override the packId with the one from the resource (more reliable)
+      orderInfo.packId = packIdFromResource;
+    } else {
+      // We have pack but couldn't find order - try to get order from pack messages
+      console.log(`[v0] Have packId=${packIdFromResource} but no matching order. Trying wider search...`);
+      orderInfo = await findOrderForBuyer(sellerId, userId, 50); // Wider search
+      if (orderInfo) {
+        orderInfo.packId = packIdFromResource;
+      }
+    }
+  } else {
+    // No pack from resource - fallback to buyer search
+    orderInfo = await findOrderForBuyer(sellerId, userId, 50); // Wider search
+  }
 
   if (!orderInfo) {
-    console.log(`[v0] No paid order found for buyer ${userId}`);
+    console.log(`[v0] No paid order found for buyer ${userId}, packFromResource=${packIdFromResource}`);
     addActivityLog({
       type: "message",
       message: `Mensaje de comprador sin orden reciente`,
-      details: `Buyer: ${userId}`,
+      details: `Buyer: ${userId} | Resource: ${resource} | PackFromResource: ${packIdFromResource || "none"}`,
     });
+    // If we at least have a packId, try to respond generically
+    if (packIdFromResource) {
+      console.log(`[v0] Attempting generic response with packId=${packIdFromResource}`);
+      try {
+        await safeSendMessage(
+          packIdFromResource, sellerId,
+          "Gracias por tu mensaje! Un asesor te respondera a la brevedad.",
+          buyerIdFromResource || userId
+        );
+        addActivityLog({
+          type: "message",
+          message: `Respuesta generica enviada (sin orden match)`,
+          details: `Pack: ${packIdFromResource}`,
+        });
+      } catch (sendErr) {
+        console.log(`[v0] Generic response failed:`, sendErr instanceof Error ? sendErr.message : sendErr);
+      }
+    }
     return;
   }
 
@@ -353,13 +435,14 @@ async function deliverCode(
   const codeResult = await getAvailableCode(product.sheetName);
 
   if (!codeResult) {
+    console.log(`[v0] SIN STOCK para ${product.label} (sheet: ${product.sheetName}), pack=${packId}`);
     await safeSendMessage(
       packId, sellerId,
-      "Estamos preparando tu codigo. Un asesor te lo enviara en breve.",
+      "Estamos preparando tu codigo. Un asesor te lo enviara en breve. Disculpa la demora!",
       buyerId
     );
-    await notifyError("stock", `Sin stock para ${product.label} - Pack: ${packId}`);
-    addActivityLog({ type: "error", message: `Sin stock: ${product.label}`, details: `Pack: ${packId}` });
+    await notifyError("stock", `SIN STOCK para ${product.label} - Pack: ${packId} - Buyer: ${buyerId}. Recargar hoja "${product.sheetName}" de Google Sheets.`);
+    addActivityLog({ type: "error", message: `SIN STOCK: ${product.label}`, details: `Pack: ${packId} | Sheet: ${product.sheetName} | Buyer: ${buyerId}. Recargar codigos en Google Sheets.` });
     return;
   }
 
