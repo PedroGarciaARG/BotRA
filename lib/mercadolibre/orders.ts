@@ -1,9 +1,9 @@
 // Handle order notifications from MercadoLibre.
-// When an order is paid, send the initial welcome message.
+// When an order is paid, register it and wait for buyer's first message.
 
-import { getOrder, sendMessages, getPackMessages, initConversation } from "./api";
+import { getOrder } from "./api";
 import { getAccessToken, getSellerId } from "./auth";
-import { detectProductType, WELCOME_MESSAGE } from "@/lib/product-config";
+import { detectProductType } from "@/lib/product-config";
 import { getPackState, setPackState, addActivityLog } from "@/lib/storage";
 import { notifyNewOrder, notifyError } from "@/lib/telegram";
 
@@ -75,91 +75,8 @@ export async function handleOrderNotification(
     };
   }
 
-  // Skip if already tracked (unless force=true for simulation)
-  if (!options?.force && getPackState(packId)) {
-    return {
-      action: "skipped_tracked",
-      message: `Pack ${packId} ya estaba trackeado en memoria`,
-      packId,
-      orderId,
-    };
-  }
-
-  // Check if ML already has seller messages for this pack (in case of restart)
-  if (!options?.force) {
-    try {
-      const existingMessages = await getPackMessages(packId, sellerId);
-      const allMessages = existingMessages.messages || [];
-      const sellerMessages = allMessages.filter(
-        (m) => String(m.from.user_id) === String(sellerId)
-      );
-      if (sellerMessages.length > 0) {
-        // Reconstruct state only - don't re-send
-        setPackState(packId, {
-          packId,
-          orderId,
-          sellerId,
-          buyerId,
-          productType: product.key,
-          productTitle: itemTitle,
-          status: "initial_sent",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-        addActivityLog({
-          type: "order",
-          message: `Orden reconstruida: ${product.label}`,
-          details: `Pack: ${packId} | Ya tenia ${sellerMessages.length} mensaje(s) del vendedor`,
-        });
-        return {
-          action: "skipped_exists",
-          message: `Pack ${packId} ya tenia ${sellerMessages.length} mensaje(s) del vendedor en ML. Estado reconstruido.`,
-          packId,
-          orderId,
-        };
-      }
-    } catch {
-      // If we can't check messages, proceed with sending
-    }
-  }
-
-  // Initialize conversation (ML requires action_guide for Mercado Envios 2)
-  // This selects "OTHER" option to enable free-form messaging
-  const firstMessage = WELCOME_MESSAGE[0] || "";
-  const conversationInitialized = await initConversation(packId, firstMessage);
-  console.log(`[v0] Conversation init for pack ${packId}: ${conversationInitialized}`);
-
-  // Send welcome message
-  // If initConversation sent the first message via action_guide with text,
-  // we still send via sendMessages as fallback (ML may handle dedup)
-  try {
-    if (!conversationInitialized) {
-      // action_guide failed or not needed, send directly
-      await sendMessages(packId, sellerId, WELCOME_MESSAGE, buyerId);
-    } else {
-      // action_guide may have sent the first message already via "OTHER" option
-      // Send remaining messages if WELCOME_MESSAGE has more than one chunk
-      if (WELCOME_MESSAGE.length > 1) {
-        await sendMessages(packId, sellerId, WELCOME_MESSAGE.slice(1), buyerId);
-      }
-      // If only 1 message, it was already sent via action_guide
-    }
-  } catch (sendErr) {
-    // If action_guide sent but direct send fails, try direct send as fallback
-    console.log(`[v0] sendMessages failed, trying direct send:`, sendErr instanceof Error ? sendErr.message : sendErr);
-    try {
-      await sendMessages(packId, sellerId, WELCOME_MESSAGE, buyerId);
-    } catch (retryErr) {
-      return {
-        action: "error",
-        message: `Error enviando mensaje: ${retryErr instanceof Error ? retryErr.message : "unknown"}`,
-        packId,
-        orderId,
-      };
-    }
-  }
-
-  // Save state only after message was sent successfully
+  // Save state (on serverless this only survives the current invocation,
+  // but the message handler will reconstruct from ML if needed)
   setPackState(packId, {
     packId,
     orderId,
@@ -167,7 +84,7 @@ export async function handleOrderNotification(
     buyerId,
     productType: product.key,
     productTitle: itemTitle,
-    status: "initial_sent",
+    status: "waiting_buyer", // New flow: wait for buyer's first message
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
@@ -182,7 +99,7 @@ export async function handleOrderNotification(
 
   return {
     action: "sent",
-    message: `Mensaje de bienvenida enviado a ${order.buyer.nickname} para ${product.label}`,
+    message: `Orden registrada: ${product.label} de ${order.buyer.nickname}. Esperando mensaje del comprador.`,
     packId,
     orderId,
   };

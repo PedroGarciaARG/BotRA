@@ -179,8 +179,8 @@ export const CANCEL_MESSAGE = `Entendemos tu decision. Para cancelar la compra a
 // Human handoff message
 export const HUMAN_MESSAGE = `Te conectamos con un asesor humano. Un vendedor te respondera a la brevedad. Mientras tanto, por favor detallanos tu consulta.`;
 
-// Unrecognized response reminder
-export const REMINDER_MESSAGE = `No entendi tu respuesta. Por favor responde con: "SI" para recibir tu codigo, "NO" para cancelar, o "HUMANO" para hablar con una persona.`;
+// Unrecognized response reminder (sent after instructions, waiting for "LISTO")
+export const REMINDER_MESSAGE = `Responde "LISTO" cuando estes listo para recibir tu codigo. Si necesitas ayuda responde "HUMANO".`;
 
 // =====================================================================
 // Question response catalog – comprehensive Q&A for all gift cards.
