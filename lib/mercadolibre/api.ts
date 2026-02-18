@@ -128,32 +128,126 @@ export async function getOrder(orderId: string) {
 }
 
 /**
- * Get a single message by its resource path from a webhook notification.
- * ML webhook sends resource like "/messages-mp-v2/123456" or "/messages/123456"
- * which can be fetched directly to get the message with pack_id info.
+ * Extract the message_id from a webhook resource string.
+ * ML webhooks send resources like:
+ *   "/messages-mp-v2/abc123"
+ *   "/messages/abc123" 
+ *   "/marketplace/messages/abc123"
  */
-export async function getMessageByResource(resource: string) {
+function extractMessageId(resource: string): string {
+  // Take the last path segment as the message_id
+  const parts = resource.split("/").filter(Boolean);
+  return parts[parts.length - 1] || resource;
+}
+
+/**
+ * Fetch a single message from ML using the webhook resource.
+ * Tries both the new marketplace API and the legacy API.
+ * Returns the message data including pack/order info needed to respond.
+ */
+export async function getMessageByResource(resource: string): Promise<{
+  messageId: string;
+  packId: string | null;
+  fromUserId: string | null;
+  toUserId: string | null;
+  text: string;
+} | null> {
+  const messageId = extractMessageId(resource);
+  console.log(`[v0] getMessageByResource: resource=${resource}, extracted messageId=${messageId}`);
+
+  // Try 1: New marketplace API  GET /marketplace/messages/{message_id}
   try {
     const data = await mlFetch<{
-      id?: string;
-      message_id?: string;
-      from?: { user_id: number | string };
-      to?: { user_id: number | string };
-      text?: string;
-      resource?: string;
-      // The pack or conversation reference
-      conversation_id?: { pack_id?: string; order_id?: string };
-      // Some formats use message_resources
-      message_resources?: Array<{
-        id: string;
-        name: string;
+      messages?: Array<{
+        id?: string;
+        message_id?: string;
+        from?: { user_id: number | string };
+        to?: { user_id: number | string };
+        text?: string;
+        message_resources?: Array<{ name: string; id: string }>;
       }>;
-    }>(resource);
-    return data;
+      paging?: unknown;
+    }>(`/marketplace/messages/${messageId}`);
+
+    if (data?.messages?.[0]) {
+      const msg = data.messages[0];
+      // The pack_id might be in message_resources or we need to find it from the order
+      let packId: string | null = null;
+      if (msg.message_resources) {
+        const packRes = msg.message_resources.find(r => r.name === "packs");
+        if (packRes) packId = packRes.id;
+      }
+      return {
+        messageId: msg.id || msg.message_id || messageId,
+        packId,
+        fromUserId: msg.from?.user_id ? String(msg.from.user_id) : null,
+        toUserId: msg.to?.user_id ? String(msg.to.user_id) : null,
+        text: msg.text || "",
+      };
+    }
   } catch (err) {
-    console.log(`[v0] getMessageByResource failed for ${resource}:`, err instanceof Error ? err.message : err);
-    return null;
+    console.log(`[v0] New marketplace /messages/${messageId} failed:`, err instanceof Error ? err.message : err);
   }
+
+  // Try 2: Legacy API  GET /messages/{message_id}
+  try {
+    const data = await mlFetch<{
+      message_id?: string;
+      from?: { user_id: number | string; email?: string };
+      to?: { user_id: number | string; email?: string };
+      text?: string;
+      resource?: string; // Contains pack path like "/packs/123456/seller/789"
+    }>(`/messages/${messageId}`);
+
+    if (data) {
+      let packId: string | null = null;
+      // Extract pack_id from the "resource" field (e.g. "/packs/123456/seller/789")
+      if (data.resource) {
+        const packMatch = data.resource.match(/\/packs\/(\d+)/);
+        if (packMatch) packId = packMatch[1];
+      }
+      return {
+        messageId: data.message_id || messageId,
+        packId,
+        fromUserId: data.from?.user_id ? String(data.from.user_id) : null,
+        toUserId: data.to?.user_id ? String(data.to.user_id) : null,
+        text: data.text || "",
+      };
+    }
+  } catch (err) {
+    console.log(`[v0] Legacy /messages/${messageId} failed:`, err instanceof Error ? err.message : err);
+  }
+
+  // Try 3: Direct resource path as-is (maybe ML changed format)
+  if (resource !== `/marketplace/messages/${messageId}` && resource !== `/messages/${messageId}`) {
+    try {
+      const data = await mlFetch<Record<string, unknown>>(resource);
+      if (data) {
+        const raw = data as Record<string, unknown>;
+        let packId: string | null = null;
+        // Try common field names
+        if (raw.pack_id) packId = String(raw.pack_id);
+        else if (raw.resource && typeof raw.resource === "string") {
+          const m = (raw.resource as string).match(/\/packs\/(\d+)/);
+          if (m) packId = m[1];
+        }
+        const from = raw.from as Record<string, unknown> | undefined;
+        const to = raw.to as Record<string, unknown> | undefined;
+        return {
+          messageId: String(raw.message_id || raw.id || messageId),
+          packId,
+          fromUserId: from?.user_id ? String(from.user_id) : null,
+          toUserId: to?.user_id ? String(to.user_id) : null,
+          text: String(raw.text || ""),
+        };
+      }
+    } catch (err) {
+      console.log(`[v0] Direct resource fetch ${resource} failed:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  console.log(`[v0] All message fetch attempts failed for resource=${resource}`);
+  return null;
 }
 
 /**

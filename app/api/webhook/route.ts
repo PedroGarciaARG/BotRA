@@ -84,7 +84,8 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      case "messages": {
+      case "messages":
+      case "marketplace_messages": {
         console.log(`[v0] Processing message: resource=${resource}, user_id=${user_id}`);
         try {
           await handleMessageNotification(resource, String(user_id));

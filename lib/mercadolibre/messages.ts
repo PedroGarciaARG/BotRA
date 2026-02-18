@@ -2,7 +2,7 @@
 // NEW FLOW: Bot waits for buyer's first message, then sends welcome + instructions.
 // Flow: buyer msg -> welcome+instructions -> buyer "LISTO" -> code -> final
 
-import { getPackMessages, sendMessage, getSellerOrders, getOrderDetails, markShipmentDelivered, initConversation, getMessageByResource } from "./api";
+import { getPackMessages, sendMessage, getSellerOrders, getOrderDetails, markShipmentDelivered, initConversation, getMessageByResource, getOrder } from "./api";
 import { getAccessToken, getSellerId } from "./auth";
 import {
   detectProductType,
@@ -90,6 +90,40 @@ async function safeSendMessages(packId: string, sellerId: string, messages: stri
       }
     }
   }
+}
+
+/**
+ * Find order info directly by pack_id using the ML /orders/{id} endpoint.
+ * This is more reliable than searching by buyer when we have the pack_id from the message.
+ */
+async function findOrderByPackId(packId: string): Promise<{
+  packId: string;
+  orderId: string;
+  buyerId: string;
+  productType: string;
+  productTitle: string;
+} | null> {
+  try {
+    // packId might actually be an order_id (when pack_id was null in ML)
+    const orderData = await getOrder(packId);
+    if (orderData && orderData.status === "paid") {
+      const itemTitle = orderData.order_items?.[0]?.item?.title || "";
+      const product = detectProductType(itemTitle);
+      if (product) {
+        return {
+          packId: String(orderData.pack_id || orderData.id),
+          orderId: String(orderData.id),
+          buyerId: String(orderData.buyer.id),
+          productType: product.key,
+          productTitle: itemTitle,
+        };
+      }
+      console.log(`[v0] findOrderByPackId: order ${packId} found but product not recognized: "${itemTitle}"`);
+    }
+  } catch (err) {
+    console.log(`[v0] findOrderByPackId GET /orders/${packId} failed:`, err instanceof Error ? err.message : err);
+  }
+  return null;
 }
 
 /**
@@ -187,43 +221,26 @@ export async function handleMessageNotification(
     return;
   }
 
-  // STRATEGY 1: Try to get pack_id directly from the message resource.
-  // ML webhook sends resource like "/messages-mp-v2/{id}" which contains conversation info.
+  // STRATEGY 1: Fetch the actual message from ML API using the webhook resource.
+  // This gives us pack_id, from/to user_ids, and the message text.
   let packIdFromResource: string | null = null;
   let buyerIdFromResource: string | null = null;
+  let messageText: string | null = null;
 
-  try {
-    const msgData = await getMessageByResource(resource);
-    console.log(`[v0] Message resource data:`, JSON.stringify(msgData).slice(0, 500));
-    if (msgData) {
-      // Try extracting pack_id from various response formats
-      const convId = (msgData as Record<string, unknown>).conversation_id as Record<string, unknown> | undefined;
-      if (convId?.pack_id) {
-        packIdFromResource = String(convId.pack_id);
-      } else if (convId?.order_id) {
-        packIdFromResource = String(convId.order_id);
-      }
-      // Also try top-level fields
-      const raw = msgData as Record<string, unknown>;
-      if (!packIdFromResource && raw.pack_id) {
-        packIdFromResource = String(raw.pack_id);
-      }
-      if (!packIdFromResource && raw.resource_id) {
-        packIdFromResource = String(raw.resource_id);
-      }
-      // Get buyer from message sender
-      if (raw.from && typeof raw.from === "object") {
-        const from = raw.from as Record<string, unknown>;
-        if (from.user_id && String(from.user_id) !== String(sellerId)) {
-          buyerIdFromResource = String(from.user_id);
-        }
-      }
+  const msgData = await getMessageByResource(resource);
+  if (msgData) {
+    packIdFromResource = msgData.packId;
+    messageText = msgData.text;
+    // Determine the buyer: whichever user_id is NOT the seller
+    if (msgData.fromUserId && String(msgData.fromUserId) !== String(sellerId)) {
+      buyerIdFromResource = msgData.fromUserId;
+    } else if (msgData.toUserId && String(msgData.toUserId) !== String(sellerId)) {
+      buyerIdFromResource = msgData.toUserId;
     }
-  } catch (err) {
-    console.log(`[v0] Could not fetch message resource: ${err instanceof Error ? err.message : err}`);
+    console.log(`[v0] Message fetched: packId=${packIdFromResource}, buyer=${buyerIdFromResource}, text="${(messageText || "").slice(0, 60)}"`);
+  } else {
+    console.log(`[v0] Could not fetch message from resource=${resource}`);
   }
-
-  console.log(`[v0] From resource: packId=${packIdFromResource}, buyerId=${buyerIdFromResource}`);
 
   // STRATEGY 2: If no pack from resource, find via buyer's recent orders (fallback).
   let orderInfo: {
@@ -235,23 +252,20 @@ export async function handleMessageNotification(
   } | null = null;
 
   if (packIdFromResource) {
-    // We have a packId from the resource, now find the matching order to get product info
-    const buyerToSearch = buyerIdFromResource || userId;
-    orderInfo = await findOrderForBuyer(sellerId, buyerToSearch);
-    if (orderInfo) {
-      // Override the packId with the one from the resource (more reliable)
-      orderInfo.packId = packIdFromResource;
-    } else {
-      // We have pack but couldn't find order - try to get order from pack messages
-      console.log(`[v0] Have packId=${packIdFromResource} but no matching order. Trying wider search...`);
-      orderInfo = await findOrderForBuyer(sellerId, userId, 50); // Wider search
+    // Best path: we have pack_id from the message, get order info directly
+    orderInfo = await findOrderByPackId(packIdFromResource);
+    if (!orderInfo) {
+      // Fallback: search by buyer in recent orders
+      const buyerToSearch = buyerIdFromResource || userId;
+      orderInfo = await findOrderForBuyer(sellerId, buyerToSearch, 50);
       if (orderInfo) {
         orderInfo.packId = packIdFromResource;
       }
     }
   } else {
-    // No pack from resource - fallback to buyer search
-    orderInfo = await findOrderForBuyer(sellerId, userId, 50); // Wider search
+    // No pack from message resource - search by buyer in recent orders
+    const buyerToSearch = buyerIdFromResource || userId;
+    orderInfo = await findOrderForBuyer(sellerId, buyerToSearch, 50);
   }
 
   if (!orderInfo) {
