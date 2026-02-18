@@ -134,19 +134,50 @@ export async function getOrder(orderId: string) {
  * The endpoint is ALWAYS /messages/packs/ even when using order_id.
  */
 export async function getPackMessages(packId: string, sellerId: string) {
+  // Message shape returned by ML (fields vary between old/new endpoint)
+  type MLMessage = {
+    id?: string;
+    message_id?: string;
+    from: { user_id: string; role?: string };
+    to: { user_id: string; role?: string };
+    text: string;
+    created_at?: string;
+    date_created?: string;
+  };
+
+  // Normalize messages from either endpoint format
+  function normalize(msgs: MLMessage[]) {
+    return msgs.map(m => ({
+      id: m.id || m.message_id || "",
+      from: { user_id: String(m.from.user_id), role: m.from.role || "" },
+      to: { user_id: String(m.to?.user_id || ""), role: m.to?.role || "" },
+      text: m.text || "",
+      created_at: m.created_at || m.date_created || "",
+    }));
+  }
+
+  // Try new /marketplace/ endpoint first
   try {
-    return await mlFetch<{
-      messages: Array<{
-        id: string;
-        from: { user_id: string; role: string };
-        to: { user_id: string; role: string };
-        text: string;
-        created_at: string;
-      }>;
+    const data = await mlFetch<{
+      messages: MLMessage[];
+      paging: { total: number };
+    }>(`/marketplace/messages/packs/${packId}?tag=post_sale`);
+    if (data.messages && data.messages.length > 0) {
+      return { messages: normalize(data.messages), paging: data.paging || { total: data.messages.length } };
+    }
+  } catch (err) {
+    console.log(`[v0] getPackMessages (new endpoint) failed for packId=${packId}:`, err instanceof Error ? err.message : err);
+  }
+
+  // Fallback to legacy endpoint
+  try {
+    const data = await mlFetch<{
+      messages: MLMessage[];
       paging: { total: number };
     }>(`/messages/packs/${packId}/sellers/${sellerId}?tag=post_sale`);
+    return { messages: normalize(data.messages || []), paging: data.paging || { total: 0 } };
   } catch (err) {
-    console.log(`[v0] getPackMessages failed for packId=${packId}:`, err instanceof Error ? err.message : err);
+    console.log(`[v0] getPackMessages (legacy) also failed for packId=${packId}:`, err instanceof Error ? err.message : err);
     return { messages: [], paging: { total: 0 } };
   }
 }
@@ -221,7 +252,9 @@ export async function initConversation(packId: string, text: string): Promise<bo
 /**
  * Send a post-sale message to the buyer.
  * ML limit: 350 chars per message (ISO-8859-1).
- * Endpoint is ALWAYS /messages/packs/ (even when packId is actually an orderId).
+ *
+ * Tries the new /marketplace/messages/packs/ endpoint first (simpler body: {text}).
+ * Falls back to the legacy /messages/packs/.../sellers/... endpoint if the new one fails.
  */
 export async function sendMessage(
   packId: string,
@@ -232,26 +265,46 @@ export async function sendMessage(
   // Truncate to 350 chars to respect ML limit
   const truncated = text.slice(0, 350);
 
-  // ML messaging API requires from.user_id as a number
-  const numericSellerId = Number(sellerId);
+  // Try NEW marketplace endpoint first (Dec 2025 docs)
+  try {
+    const result = await mlFetch(
+      `/marketplace/messages/packs/${packId}`,
+      {
+        method: "POST",
+        body: { text: truncated },
+      }
+    );
+    console.log(`[v0] sendMessage OK (new endpoint) pack=${packId}`);
+    return result;
+  } catch (newErr) {
+    console.log(`[v0] New endpoint failed for pack=${packId}: ${newErr instanceof Error ? newErr.message : newErr}, trying legacy...`);
+  }
 
+  // Fallback: legacy endpoint
+  const numericSellerId = Number(sellerId);
   const messageBody: Record<string, unknown> = {
     from: { user_id: numericSellerId },
     text: truncated,
   };
 
-  // Include buyer ID if available
   if (buyerId) {
     messageBody.to = { user_id: Number(buyerId) };
   }
 
-  return mlFetch(
-    `/messages/packs/${packId}/sellers/${sellerId}?tag=post_sale`,
-    {
-      method: "POST",
-      body: messageBody,
-    }
-  );
+  try {
+    const result = await mlFetch(
+      `/messages/packs/${packId}/sellers/${sellerId}?tag=post_sale`,
+      {
+        method: "POST",
+        body: messageBody,
+      }
+    );
+    console.log(`[v0] sendMessage OK (legacy endpoint) pack=${packId}`);
+    return result;
+  } catch (legacyErr) {
+    console.log(`[v0] Legacy endpoint also failed for pack=${packId}: ${legacyErr instanceof Error ? legacyErr.message : legacyErr}`);
+    throw legacyErr;
+  }
 }
 
 /**

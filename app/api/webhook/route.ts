@@ -85,19 +85,26 @@ export async function POST(req: NextRequest) {
       }
 
       case "messages": {
-        console.log(`[v0] Processing message: ${resource} for user ${user_id}`);
+        console.log(`[v0] Processing message: resource=${resource}, user_id=${user_id}`);
         try {
           await handleMessageNotification(resource, String(user_id));
           console.log(`[v0] Message processed successfully`);
+          addActivityLog({
+            type: "message",
+            message: `Mensaje procesado correctamente`,
+            details: `resource=${resource} | user_id=${user_id}`,
+          });
         } catch (mErr) {
           const mMsg = mErr instanceof Error ? mErr.message : String(mErr);
+          const mStack = mErr instanceof Error ? mErr.stack : "";
           console.log(`[v0] Message handling FAILED: ${mMsg}`);
+          console.log(`[v0] Stack: ${mStack}`);
           addActivityLog({
             type: "error",
             message: `Error procesando mensaje: ${mMsg.slice(0, 120)}`,
-            details: resource,
+            details: `resource=${resource} | ${mMsg} | Stack: ${(mStack || "").slice(0, 200)}`,
           });
-          await notifyError("message", mMsg).catch(() => {});
+          await notifyError("message", `${mMsg}\nResource: ${resource}\nUser: ${user_id}`).catch(() => {});
         }
         break;
       }

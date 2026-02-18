@@ -2,7 +2,7 @@
 // NEW FLOW: Bot waits for buyer's first message, then sends welcome + instructions.
 // Flow: buyer msg -> welcome+instructions -> buyer "LISTO" -> code -> final
 
-import { getPackMessages, sendMessage, sendMessages, getSellerOrders, getOrderDetails, markShipmentDelivered, mlFetch, initConversation } from "./api";
+import { getPackMessages, sendMessage, getSellerOrders, getOrderDetails, markShipmentDelivered, initConversation } from "./api";
 import { getAccessToken, getSellerId } from "./auth";
 import {
   detectProductType,
@@ -18,17 +18,53 @@ import { notifyHumanRequested, notifyCodeDelivered, notifyError } from "@/lib/te
 
 /**
  * Try to send a message, with automatic initConversation retry if it fails.
+ * initConversation with option "OTHER" may already deliver the text,
+ * so we check whether we need to re-send after init.
  */
 async function safeSendMessage(packId: string, sellerId: string, text: string, buyerId?: string) {
   try {
     await sendMessage(packId, sellerId, text, buyerId);
+    console.log(`[v0] safeSendMessage OK for pack=${packId}`);
+    return;
   } catch (err) {
-    console.log(`[v0] sendMessage failed, trying initConversation + retry:`, err instanceof Error ? err.message : err);
-    await initConversation(packId, text);
-    try {
-      await sendMessage(packId, sellerId, text, buyerId);
-    } catch {
-      console.log(`[v0] Retry also failed, initConversation likely already sent it`);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.log(`[v0] sendMessage failed for pack=${packId}: ${errMsg}`);
+
+    // If blocked_by_conversation or 403/400, try initConversation first
+    if (
+      errMsg.includes("blocked_by_conversation") ||
+      errMsg.includes("403") ||
+      errMsg.includes("400") ||
+      errMsg.includes("not_found") ||
+      errMsg.includes("invalid_pack")
+    ) {
+      console.log(`[v0] Trying initConversation for pack=${packId}...`);
+      const initSent = await initConversation(packId, text);
+
+      if (initSent) {
+        // initConversation with "OTHER" option and text already sends the message
+        // Verify by checking if message appears in conversation
+        await new Promise(r => setTimeout(r, 1500));
+        try {
+          const check = await getPackMessages(packId, sellerId);
+          const lastMsg = check.messages[check.messages.length - 1];
+          if (lastMsg && String(lastMsg.from.user_id) === String(sellerId)) {
+            console.log(`[v0] initConversation already delivered the message for pack=${packId}`);
+            return; // Message was sent via initConversation
+          }
+        } catch {
+          // Couldn't verify, try sending anyway
+        }
+      }
+
+      // Try sending again after init
+      try {
+        await sendMessage(packId, sellerId, text, buyerId);
+        console.log(`[v0] sendMessage retry OK after initConversation for pack=${packId}`);
+        return;
+      } catch (retryErr) {
+        console.log(`[v0] Retry after initConversation also failed for pack=${packId}:`, retryErr instanceof Error ? retryErr.message : retryErr);
+      }
     }
   }
 }
@@ -36,13 +72,21 @@ async function safeSendMessage(packId: string, sellerId: string, text: string, b
 async function safeSendMessages(packId: string, sellerId: string, messages: string[], buyerId?: string) {
   for (let i = 0; i < messages.length; i++) {
     if (i === 0) {
+      // First message uses safeSendMessage (handles initConversation if needed)
       await safeSendMessage(packId, sellerId, messages[i], buyerId);
     } else {
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 800)); // Slightly longer delay to avoid rate limits
       try {
         await sendMessage(packId, sellerId, messages[i], buyerId);
+        console.log(`[v0] safeSendMessages chunk ${i}/${messages.length - 1} OK for pack=${packId}`);
       } catch (err) {
-        console.log(`[v0] safeSendMessages chunk ${i} failed:`, err instanceof Error ? err.message : err);
+        console.log(`[v0] safeSendMessages chunk ${i}/${messages.length - 1} failed for pack=${packId}:`, err instanceof Error ? err.message : err);
+        // Try once more with safeSendMessage (which handles init)
+        try {
+          await safeSendMessage(packId, sellerId, messages[i], buyerId);
+        } catch {
+          console.log(`[v0] safeSendMessages chunk ${i} retry also failed, skipping`);
+        }
       }
     }
   }
@@ -158,6 +202,11 @@ export async function handleMessageNotification(
 
   const { packId, orderId, buyerId, productType, productTitle } = orderInfo;
   console.log(`[v0] Found order: pack=${packId}, order=${orderId}, product=${productType}`);
+  addActivityLog({
+    type: "message",
+    message: `Procesando mensaje de comprador`,
+    details: `Pack: ${packId} | Orden: ${orderId} | Producto: ${productType} | Buyer: ${buyerId}`,
+  });
 
   // Get all messages in this conversation
   const msgsData = await getPackMessages(packId, sellerId);
