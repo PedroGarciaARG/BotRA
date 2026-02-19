@@ -1,9 +1,9 @@
 // Test endpoint to diagnose connection issues.
 // GET /api/test - checks ML auth, Google Sheets, and bot status
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getAccessToken, getSellerId } from "@/lib/mercadolibre/auth";
-import { mlFetch, sendMessage, getPackMessages, initConversation } from "@/lib/mercadolibre/api";
+import { mlFetch } from "@/lib/mercadolibre/api";
 import { verifyConnection as verifySheetsConnection } from "@/lib/google-sheets";
 import { getBotEnabled, getTokens } from "@/lib/storage";
 
@@ -86,56 +86,4 @@ export async function GET() {
   return NextResponse.json(results, {
     headers: { "Cache-Control": "no-store" },
   });
-}
-
-/**
- * POST /api/test - Test sending a message to a specific pack.
- * Body: { packId: string, text?: string, action?: "send" | "init" | "read" }
- */
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { packId, text = "Test message from bot", action = "send" } = body;
-
-    if (!packId) {
-      return NextResponse.json({ error: "packId is required" }, { status: 400 });
-    }
-
-    await getAccessToken();
-    const sellerId = getSellerId();
-    if (!sellerId) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const results: Record<string, unknown> = { packId, sellerId, action };
-
-    if (action === "read") {
-      const msgs = await getPackMessages(packId, sellerId);
-      results.messages = msgs.messages;
-      results.total = msgs.paging?.total;
-      return NextResponse.json(results);
-    }
-
-    if (action === "init") {
-      const initResult = await initConversation(packId, text);
-      results.initResult = initResult;
-      return NextResponse.json(results);
-    }
-
-    // action === "send"
-    try {
-      await sendMessage(packId, sellerId, text);
-      results.sendResult = "ok";
-    } catch (err) {
-      results.sendResult = "error";
-      results.sendError = err instanceof Error ? err.message : String(err);
-    }
-
-    return NextResponse.json(results);
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
-  }
 }

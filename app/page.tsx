@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/sonner";
 import { ConnectionStatus } from "@/components/dashboard/connection-status";
@@ -58,6 +58,26 @@ export default function DashboardPage() {
   const authError = statsData?.authError || null;
   const botEnabled = botEnabledLocal ?? statsData?.botEnabled ?? true;
   const tokenExpiresAt = statsData?.tokenExpiresAt ?? undefined;
+
+  // Auto-check for new messages every 15 seconds (since ML webhooks may not work for messages)
+  useEffect(() => {
+    if (!authenticated || !botEnabled) return;
+
+    const checkMessages = async () => {
+      try {
+        await fetch("/api/check-messages", { method: "POST" });
+      } catch (err) {
+        console.log("[v0] Auto check-messages failed:", err);
+      }
+    };
+
+    // Check immediately on mount
+    checkMessages();
+
+    // Then check every 15 seconds
+    const interval = setInterval(checkMessages, 15000);
+    return () => clearInterval(interval);
+  }, [authenticated, botEnabled]);
 
   return (
     <main className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-8">
