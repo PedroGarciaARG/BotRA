@@ -2,69 +2,35 @@
 // NEW FLOW: Bot waits for buyer's first message, then sends welcome + instructions.
 // Flow: buyer msg -> welcome+instructions -> buyer "LISTO" -> code -> final
 
-import { getPackMessages, sendMessage, getSellerOrders, getOrderDetails, markShipmentDelivered, initConversation, getMessageByResource, getOrder } from "./api";
+import { getPackMessages, sendMessage, sendMessages, getSellerOrders, getOrderDetails, markShipmentDelivered, mlFetch, initConversation } from "./api";
 import { getAccessToken, getSellerId } from "./auth";
 import {
   detectProductType,
   getProductByKey,
   WELCOME_MESSAGE,
   CANCEL_MESSAGE,
-  HUMAN_MESSAGE,
   REMINDER_MESSAGE,
+  THANKS_RESPONSE,
+  THANKS_RESPONSE_ALT,
 } from "@/lib/product-config";
 import { addActivityLog } from "@/lib/storage";
 import { getAvailableCode, markCodeDelivered } from "@/lib/google-sheets";
-import { notifyHumanRequested, notifyCodeDelivered, notifyError } from "@/lib/telegram";
+import { notifyHumanRequested, notifyCodeDelivered, notifyOutOfStock } from "@/lib/telegram";
+import { generateChatResponse, splitMessageIntoChunks } from "@/lib/openai";
 
 /**
  * Try to send a message, with automatic initConversation retry if it fails.
- * initConversation with option "OTHER" may already deliver the text,
- * so we check whether we need to re-send after init.
  */
 async function safeSendMessage(packId: string, sellerId: string, text: string, buyerId?: string) {
   try {
     await sendMessage(packId, sellerId, text, buyerId);
-    console.log(`[v0] safeSendMessage OK for pack=${packId}`);
-    return;
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    console.log(`[v0] sendMessage failed for pack=${packId}: ${errMsg}`);
-
-    // If blocked_by_conversation or 403/400, try initConversation first
-    if (
-      errMsg.includes("blocked_by_conversation") ||
-      errMsg.includes("403") ||
-      errMsg.includes("400") ||
-      errMsg.includes("not_found") ||
-      errMsg.includes("invalid_pack")
-    ) {
-      console.log(`[v0] Trying initConversation for pack=${packId}...`);
-      const initSent = await initConversation(packId, text);
-
-      if (initSent) {
-        // initConversation with "OTHER" option and text already sends the message
-        // Verify by checking if message appears in conversation
-        await new Promise(r => setTimeout(r, 1500));
-        try {
-          const check = await getPackMessages(packId, sellerId);
-          const lastMsg = check.messages[check.messages.length - 1];
-          if (lastMsg && String(lastMsg.from.user_id) === String(sellerId)) {
-            console.log(`[v0] initConversation already delivered the message for pack=${packId}`);
-            return; // Message was sent via initConversation
-          }
-        } catch {
-          // Couldn't verify, try sending anyway
-        }
-      }
-
-      // Try sending again after init
-      try {
-        await sendMessage(packId, sellerId, text, buyerId);
-        console.log(`[v0] sendMessage retry OK after initConversation for pack=${packId}`);
-        return;
-      } catch (retryErr) {
-        console.log(`[v0] Retry after initConversation also failed for pack=${packId}:`, retryErr instanceof Error ? retryErr.message : retryErr);
-      }
+    console.log(`[v0] sendMessage failed, trying initConversation + retry:`, err instanceof Error ? err.message : err);
+    await initConversation(packId, text);
+    try {
+      await sendMessage(packId, sellerId, text, buyerId);
+    } catch {
+      console.log(`[v0] Retry also failed, initConversation likely already sent it`);
     }
   }
 }
@@ -72,64 +38,22 @@ async function safeSendMessage(packId: string, sellerId: string, text: string, b
 async function safeSendMessages(packId: string, sellerId: string, messages: string[], buyerId?: string) {
   for (let i = 0; i < messages.length; i++) {
     if (i === 0) {
-      // First message uses safeSendMessage (handles initConversation if needed)
       await safeSendMessage(packId, sellerId, messages[i], buyerId);
     } else {
-      await new Promise(r => setTimeout(r, 800)); // Slightly longer delay to avoid rate limits
+      await new Promise(r => setTimeout(r, 500));
       try {
         await sendMessage(packId, sellerId, messages[i], buyerId);
-        console.log(`[v0] safeSendMessages chunk ${i}/${messages.length - 1} OK for pack=${packId}`);
       } catch (err) {
-        console.log(`[v0] safeSendMessages chunk ${i}/${messages.length - 1} failed for pack=${packId}:`, err instanceof Error ? err.message : err);
-        // Try once more with safeSendMessage (which handles init)
-        try {
-          await safeSendMessage(packId, sellerId, messages[i], buyerId);
-        } catch {
-          console.log(`[v0] safeSendMessages chunk ${i} retry also failed, skipping`);
-        }
+        console.log(`[v0] safeSendMessages chunk ${i} failed:`, err instanceof Error ? err.message : err);
       }
     }
   }
-}
-
-/**
- * Find order info directly by pack_id using the ML /orders/{id} endpoint.
- * This is more reliable than searching by buyer when we have the pack_id from the message.
- */
-async function findOrderByPackId(packId: string): Promise<{
-  packId: string;
-  orderId: string;
-  buyerId: string;
-  productType: string;
-  productTitle: string;
-} | null> {
-  try {
-    // packId might actually be an order_id (when pack_id was null in ML)
-    const orderData = await getOrder(packId);
-    if (orderData && orderData.status === "paid") {
-      const itemTitle = orderData.order_items?.[0]?.item?.title || "";
-      const product = detectProductType(itemTitle);
-      if (product) {
-        return {
-          packId: String(orderData.pack_id || orderData.id),
-          orderId: String(orderData.id),
-          buyerId: String(orderData.buyer.id),
-          productType: product.key,
-          productTitle: itemTitle,
-        };
-      }
-      console.log(`[v0] findOrderByPackId: order ${packId} found but product not recognized: "${itemTitle}"`);
-    }
-  } catch (err) {
-    console.log(`[v0] findOrderByPackId GET /orders/${packId} failed:`, err instanceof Error ? err.message : err);
-  }
-  return null;
 }
 
 /**
  * Find the order/pack associated with a buyer by searching recent seller orders.
  */
-async function findOrderForBuyer(sellerId: string, buyerUserId: string, searchLimit: number = 20): Promise<{
+async function findOrderForBuyer(sellerId: string, buyerUserId: string): Promise<{
   packId: string;
   orderId: string;
   buyerId: string;
@@ -137,9 +61,8 @@ async function findOrderForBuyer(sellerId: string, buyerUserId: string, searchLi
   productTitle: string;
 } | null> {
   try {
-    const ordersData = await getSellerOrders(sellerId, searchLimit, 0);
+    const ordersData = await getSellerOrders(sellerId, 20, 0);
     const orders = ordersData.results || [];
-    console.log(`[v0] findOrderForBuyer: searching ${orders.length} orders for buyer ${buyerUserId}`);
 
     for (const order of orders) {
       if (String(order.buyer.id) === String(buyerUserId) && order.status === "paid") {
@@ -221,88 +144,22 @@ export async function handleMessageNotification(
     return;
   }
 
-  // STRATEGY 1: Fetch the actual message from ML API using the webhook resource.
-  // This gives us pack_id, from/to user_ids, and the message text.
-  let packIdFromResource: string | null = null;
-  let buyerIdFromResource: string | null = null;
-  let messageText: string | null = null;
-
-  const msgData = await getMessageByResource(resource);
-  if (msgData) {
-    packIdFromResource = msgData.packId;
-    messageText = msgData.text;
-    // Determine the buyer: whichever user_id is NOT the seller
-    if (msgData.fromUserId && String(msgData.fromUserId) !== String(sellerId)) {
-      buyerIdFromResource = msgData.fromUserId;
-    } else if (msgData.toUserId && String(msgData.toUserId) !== String(sellerId)) {
-      buyerIdFromResource = msgData.toUserId;
-    }
-    console.log(`[v0] Message fetched: packId=${packIdFromResource}, buyer=${buyerIdFromResource}, text="${(messageText || "").slice(0, 60)}"`);
-  } else {
-    console.log(`[v0] Could not fetch message from resource=${resource}`);
-  }
-
-  // STRATEGY 2: If no pack from resource, find via buyer's recent orders (fallback).
-  let orderInfo: {
-    packId: string;
-    orderId: string;
-    buyerId: string;
-    productType: string;
-    productTitle: string;
-  } | null = null;
-
-  if (packIdFromResource) {
-    // Best path: we have pack_id from the message, get order info directly
-    orderInfo = await findOrderByPackId(packIdFromResource);
-    if (!orderInfo) {
-      // Fallback: search by buyer in recent orders
-      const buyerToSearch = buyerIdFromResource || userId;
-      orderInfo = await findOrderForBuyer(sellerId, buyerToSearch, 50);
-      if (orderInfo) {
-        orderInfo.packId = packIdFromResource;
-      }
-    }
-  } else {
-    // No pack from message resource - search by buyer in recent orders
-    const buyerToSearch = buyerIdFromResource || userId;
-    orderInfo = await findOrderForBuyer(sellerId, buyerToSearch, 50);
-  }
+  // userId = the buyer who sent the message.
+  // Find their recent order to get the packId and product.
+  const orderInfo = await findOrderForBuyer(sellerId, userId);
 
   if (!orderInfo) {
-    console.log(`[v0] No paid order found for buyer ${userId}, packFromResource=${packIdFromResource}`);
+    console.log(`[v0] No paid order found for buyer ${userId}`);
     addActivityLog({
       type: "message",
       message: `Mensaje de comprador sin orden reciente`,
-      details: `Buyer: ${userId} | Resource: ${resource} | PackFromResource: ${packIdFromResource || "none"}`,
+      details: `Buyer: ${userId}`,
     });
-    // If we at least have a packId, try to respond generically
-    if (packIdFromResource) {
-      console.log(`[v0] Attempting generic response with packId=${packIdFromResource}`);
-      try {
-        await safeSendMessage(
-          packIdFromResource, sellerId,
-          "Gracias por tu mensaje! Un asesor te respondera a la brevedad.",
-          buyerIdFromResource || userId
-        );
-        addActivityLog({
-          type: "message",
-          message: `Respuesta generica enviada (sin orden match)`,
-          details: `Pack: ${packIdFromResource}`,
-        });
-      } catch (sendErr) {
-        console.log(`[v0] Generic response failed:`, sendErr instanceof Error ? sendErr.message : sendErr);
-      }
-    }
     return;
   }
 
   const { packId, orderId, buyerId, productType, productTitle } = orderInfo;
   console.log(`[v0] Found order: pack=${packId}, order=${orderId}, product=${productType}`);
-  addActivityLog({
-    type: "message",
-    message: `Procesando mensaje de comprador`,
-    details: `Pack: ${packId} | Orden: ${orderId} | Producto: ${productType} | Buyer: ${buyerId}`,
-  });
 
   // Get all messages in this conversation
   const msgsData = await getPackMessages(packId, sellerId);
@@ -332,14 +189,26 @@ export async function handleMessageNotification(
     return;
   }
 
-  // Already delivered code - only respond to help requests
+  // Already delivered code - only respond to thanks or questions
   if (status === "code_sent") {
-    if (lastBuyerText.includes("humano") || lastBuyerText.includes("persona") || lastBuyerText.includes("ayuda") || lastBuyerText.includes("problema")) {
-      await safeSendMessage(packId, sellerId, HUMAN_MESSAGE, buyerId);
-      await notifyHumanRequested(packId, lastBuyerText);
-      addActivityLog({ type: "human", message: "Ayuda post-entrega", details: `Pack: ${packId}` });
+    // Check if buyer is thanking
+    if (isThanking(lastBuyerText)) {
+      const thanksMsg = Math.random() > 0.5 ? THANKS_RESPONSE : THANKS_RESPONSE_ALT;
+      await safeSendMessage(packId, sellerId, thanksMsg, buyerId);
+      addActivityLog({ type: "message", message: "Agradecimiento post-entrega", details: `Pack: ${packId}` });
+      return;
     }
-    // Otherwise don't respond - code was already delivered
+    
+    // If asking something specific, try AI
+    if (lastBuyerText.length > 10) {
+      const postDeliveryContext = "Código ya fue entregado. Comprador pregunta algo post-entrega.";
+      const aiResponse = await tryAIResponse(lastBuyerText, productTitle, packId, sellerId, buyerId, postDeliveryContext);
+      if (!aiResponse) {
+        // AI couldn't help - notify via Telegram
+        await notifyHumanRequested(packId, `Post-entrega: "${lastBuyerText}"`);
+        addActivityLog({ type: "human", message: "🤔 Consulta post-entrega no entendida", details: `Pack: ${packId}` });
+      }
+    }
     return;
   }
 
@@ -350,92 +219,110 @@ export async function handleMessageNotification(
 
   // ---- NO SELLER MESSAGES YET (first buyer message after purchase) ----
   if (status === "no_seller_msgs") {
-    // Send welcome + instructions together since buyer is already engaged
-    console.log(`[v0] First interaction - sending welcome + instructions`);
-    const welcomeAndInstructions = [
-      ...WELCOME_MESSAGE,
-      ...product.instructions,
-    ];
-    await safeSendMessages(packId, sellerId, welcomeAndInstructions, buyerId);
+    // Send welcome asking about experience
+    console.log(`[v0] First interaction - sending welcome`);
+    await safeSendMessages(packId, sellerId, WELCOME_MESSAGE, buyerId);
     addActivityLog({
       type: "message",
-      message: `Bienvenida + instrucciones enviadas: ${product.label}`,
+      message: `Bienvenida enviada: ${product.label}`,
       details: `Pack: ${packId} | Comprador escribio: "${lastBuyerText.slice(0, 60)}"`,
     });
     return;
   }
 
-  // ---- WELCOME WAS SENT, buyer responds ----
+  // ---- WELCOME WAS SENT, buyer responds about experience ----
   if (status === "welcome_sent") {
-    const isConfirm = isConfirmation(lastBuyerText);
-    if (isConfirm) {
-      // Send instructions
-      await safeSendMessages(packId, sellerId, product.instructions, buyerId);
-      addActivityLog({
-        type: "message",
-        message: `Instrucciones enviadas: ${product.label}`,
-        details: `Pack: ${packId}`,
-      });
-      return;
-    }
-    // Check cancel/human
-    if (isCancel(lastBuyerText)) {
-      await safeSendMessage(packId, sellerId, CANCEL_MESSAGE, buyerId);
-      addActivityLog({ type: "message", message: "Compra cancelada", details: `Pack: ${packId}` });
-      return;
-    }
-    if (isHumanRequest(lastBuyerText)) {
-      await safeSendMessage(packId, sellerId, HUMAN_MESSAGE, buyerId);
-      await notifyHumanRequested(packId, lastBuyerText);
-      addActivityLog({ type: "human", message: "Humano solicitado", details: `Pack: ${packId}` });
-      return;
-    }
-    // Unrecognized - send instructions anyway (they're engaged)
+    // Regardless of answer, send instructions directly
+    // Following the pattern from examples: ask experience, then send instructions
     await safeSendMessages(packId, sellerId, product.instructions, buyerId);
     addActivityLog({
       type: "message",
-      message: `Instrucciones enviadas (respuesta no reconocida): ${product.label}`,
-      details: `Pack: ${packId} | Msg: "${lastBuyerText.slice(0, 60)}"`,
+      message: `Instrucciones enviadas: ${product.label}`,
+      details: `Pack: ${packId} | Respuesta: "${lastBuyerText.slice(0, 40)}"`,
     });
     return;
   }
 
   // ---- INSTRUCTIONS WERE SENT, buyer responds ----
   if (status === "instructions_sent") {
+    // Check if it's a simple confirmation/ready to proceed
     const isReady = lastBuyerText === "listo" || lastBuyerText.includes("listo") ||
       lastBuyerText === "dale" || lastBuyerText === "ok" || lastBuyerText === "si" ||
-      lastBuyerText === "sí" || lastBuyerText === "ya" || lastBuyerText === "ready";
-
-    if (isCancel(lastBuyerText)) {
-      await safeSendMessage(packId, sellerId, CANCEL_MESSAGE, buyerId);
-      addActivityLog({ type: "message", message: "Compra cancelada", details: `Pack: ${packId}` });
-      return;
-    }
-    if (isHumanRequest(lastBuyerText)) {
-      await safeSendMessage(packId, sellerId, HUMAN_MESSAGE, buyerId);
-      await notifyHumanRequested(packId, lastBuyerText);
-      addActivityLog({ type: "human", message: "Humano solicitado", details: `Pack: ${packId}` });
-      return;
-    }
+      lastBuyerText === "sí" || lastBuyerText === "ya" || lastBuyerText.includes("esperando") ||
+      lastBuyerText.includes("espero") || lastBuyerText.includes("pasame") ||
+      lastBuyerText.includes("envía") || lastBuyerText.includes("envia");
 
     if (isReady) {
       await deliverCode(packId, orderId, sellerId, buyerId, product, productTitle);
       return;
     }
 
-    // Not "listo" but instructions were sent - remind them
-    await safeSendMessage(packId, sellerId, REMINDER_MESSAGE, buyerId);
-    addActivityLog({
-      type: "message",
-      message: "Recordatorio enviado",
-      details: `Pack: ${packId} | Msg: "${lastBuyerText.slice(0, 60)}"`,
-    });
+    // Check if it's a thank you or acknowledgment (don't send code yet)
+    if (isThanking(lastBuyerText) || isSimpleAcknowledgment(lastBuyerText)) {
+      // Don't respond - they're just acknowledging, wait for them to say "listo"
+      console.log(`[v0] Buyer acknowledged instructions, waiting for "listo"`);
+      return;
+    }
+
+    // If they're asking something, try AI
+    const instructionsContext = "Comprador ya recibió las instrucciones de canje. Está preguntando algo antes de confirmar que está listo.";
+    const aiResponse = await tryAIResponse(lastBuyerText, productTitle, packId, sellerId, buyerId, instructionsContext);
+    if (!aiResponse) {
+      // AI couldn't respond - notify human via Telegram (critical case)
+      await notifyHumanRequested(packId, `IA no entendió: "${lastBuyerText}"`);
+      addActivityLog({
+        type: "human",
+        message: "🤔 IA no entendió - Telegram notificado",
+        details: `Pack: ${packId} | Msg: "${lastBuyerText.slice(0, 60)}"`,
+      });
+    }
     return;
   }
 }
 
 /**
+ * Try to generate an intelligent, conversational response using AI.
+ * Uses the new chat-focused AI with FAQ knowledge.
+ * Returns true if AI responded successfully, false if human intervention is needed.
+ */
+async function tryAIResponse(
+  buyerText: string,
+  productTitle: string,
+  packId: string,
+  sellerId: string,
+  buyerId: string,
+  conversationContext?: string
+): Promise<boolean> {
+  try {
+    const aiMessages = await generateChatResponse(
+      buyerText,
+      productTitle,
+      conversationContext
+    );
+
+    if (!aiMessages || aiMessages.length === 0) {
+      // AI couldn't help - needs human
+      return false;
+    }
+
+    // Send all AI response chunks (already split at 350 chars)
+    await safeSendMessages(packId, sellerId, aiMessages, buyerId);
+    
+    addActivityLog({
+      type: "message",
+      message: "IA respondió conversacionalmente",
+      details: `Pack: ${packId} | Pregunta: "${buyerText.slice(0, 40)}" | Respuesta: "${aiMessages[0].slice(0, 40)}"`,
+    });
+    return true;
+  } catch (err) {
+    console.log(`[v0] AI response failed:`, err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
+/**
  * Deliver the code from Google Sheets and send final messages.
+ * Handles out-of-stock scenarios with Telegram alert.
  */
 async function deliverCode(
   packId: string,
@@ -449,14 +336,18 @@ async function deliverCode(
   const codeResult = await getAvailableCode(product.sheetName);
 
   if (!codeResult) {
-    console.log(`[v0] SIN STOCK para ${product.label} (sheet: ${product.sheetName}), pack=${packId}`);
-    await safeSendMessage(
-      packId, sellerId,
-      "Estamos preparando tu codigo. Un asesor te lo enviara en breve. Disculpa la demora!",
-      buyerId
-    );
-    await notifyError("stock", `SIN STOCK para ${product.label} - Pack: ${packId} - Buyer: ${buyerId}. Recargar hoja "${product.sheetName}" de Google Sheets.`);
-    addActivityLog({ type: "error", message: `SIN STOCK: ${product.label}`, details: `Pack: ${packId} | Sheet: ${product.sheetName} | Buyer: ${buyerId}. Recargar codigos en Google Sheets.` });
+    // SIN STOCK - notify via Telegram and inform buyer
+    const noStockMessage = "En breve te enviaremos el código. Estamos preparando tu gift card.";
+    await safeSendMessage(packId, sellerId, noStockMessage, buyerId);
+    
+    // CRITICAL: Alert via Telegram for stock refill
+    await notifyOutOfStock(packId, product.label);
+    
+    addActivityLog({ 
+      type: "error", 
+      message: `🚨 SIN STOCK: ${product.label}`, 
+      details: `Pack: ${packId} - Telegram notificado` 
+    });
     return;
   }
 
@@ -467,21 +358,17 @@ async function deliverCode(
   // Mark code as delivered in sheet
   await markCodeDelivered(product.sheetName, codeResult.row, orderId);
 
-  // Send final message
+  // Send final message (already split into chunks in product config)
   await new Promise(r => setTimeout(r, 800));
-  const finalText = product.finalMessage.join("\n\n");
-  if (finalText.length <= 350) {
-    await safeSendMessage(packId, sellerId, finalText, buyerId);
-  } else {
-    await safeSendMessages(packId, sellerId, product.finalMessage, buyerId);
-  }
+  await safeSendMessages(packId, sellerId, product.finalMessage, buyerId);
 
   addActivityLog({
     type: "code_delivery",
-    message: `Codigo entregado: ${product.label}`,
+    message: `✅ Código entregado: ${product.label}`,
     details: `Pack: ${packId} | Code: ${codeResult.code.slice(0, 4)}...`,
   });
 
+  // Log delivery (no Telegram notification per user request)
   await notifyCodeDelivered(packId, product.label, codeResult.code);
 
   // Auto-mark as delivered in ML
@@ -497,25 +384,24 @@ async function deliverCode(
 
 // ---- Helper matchers ----
 
-function isConfirmation(text: string): boolean {
+function isThanking(text: string): boolean {
   return (
-    text === "si" || text === "sí" || text === "confirmo" || text === "dale" ||
-    text === "hola" || text === "buenas" || text === "buen dia" ||
-    text === "buenas tardes" || text === "buenas noches" || text === "buenos dias" ||
-    text === "ok" || text === "ya" ||
-    text.startsWith("hola ") || text.startsWith("buenas ") ||
-    text.startsWith("si ") || text.startsWith("si,") ||
-    text.startsWith("sí ") || text.startsWith("sí,")
+    text.includes("gracias") || text.includes("muchas gracias") ||
+    text.includes("graciass") || text.includes("muchas") ||
+    text.includes("thank") || text.includes("genial") ||
+    text.includes("perfecto") || text.includes("excelente") ||
+    text.includes("buenisimo") || text.includes("buenísimo")
+  );
+}
+
+function isSimpleAcknowledgment(text: string): boolean {
+  return (
+    text === "ok" || text === "dale" || text === "si" || text === "sí" ||
+    text === "okey" || text === "okay" || text === "entiendo" ||
+    text.length < 8 // Very short responses are usually acknowledgments
   );
 }
 
 function isCancel(text: string): boolean {
   return text === "no" || text.startsWith("no ") || text.includes("cancelar");
-}
-
-function isHumanRequest(text: string): boolean {
-  return (
-    text.includes("humano") || text.includes("persona") ||
-    text.includes("atencion") || text.includes("ayuda")
-  );
 }

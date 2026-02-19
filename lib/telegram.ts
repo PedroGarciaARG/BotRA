@@ -31,19 +31,23 @@ async function sendTelegramMessage(text: string): Promise<boolean> {
   }
 }
 
+/**
+ * Notify when AI doesn't understand something from the chat.
+ * Only sent in critical cases where human intervention is needed.
+ */
 export async function notifyHumanRequested(
   packId: string,
   buyerMessage: string,
   buyerNickname?: string
 ) {
   const text = [
-    "ATENCION REQUERIDA",
+    "🤔 NO ENTIENDO - ATENCION REQUERIDA",
     "",
     `Pack: ${packId}`,
     buyerNickname ? `Comprador: ${buyerNickname}` : "",
     `Mensaje: "${buyerMessage}"`,
     "",
-    "El comprador pidio hablar con una persona.",
+    "La IA no pudo entender o responder esto. Revisa el chat en ML.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -51,33 +55,60 @@ export async function notifyHumanRequested(
   return sendTelegramMessage(text);
 }
 
+/**
+ * Removed: Code delivery notifications are no longer sent to reduce noise.
+ * Only critical events (stock issues, errors, AI confusion) trigger Telegram alerts.
+ */
 export async function notifyCodeDelivered(
   packId: string,
   productType: string,
   code: string
 ) {
+  // Notification disabled per user request - only send on critical events
+  console.log(`[v0] Code delivered: ${packId} | ${productType} | ${code.slice(0, 4)}...`);
+  return Promise.resolve(true);
+}
+
+/**
+ * Notify about out-of-stock situation (CRITICAL - always sent).
+ */
+export async function notifyOutOfStock(
+  packId: string,
+  productType: string
+) {
   const text = [
-    "CODIGO ENTREGADO",
+    "🚨 SIN STOCK - URGENTE",
     "",
     `Pack: ${packId}`,
     `Producto: ${productType}`,
-    `Codigo: \`${code}\``,
+    "",
+    "No hay codigos disponibles en el Drive. Recarga urgentemente.",
   ].join("\n");
 
   return sendTelegramMessage(text);
 }
 
 export async function notifyError(context: string, error: string) {
-  const text = [
-    "ERROR EN BOT",
-    "",
-    `Contexto: ${context}`,
-    `Error: ${error}`,
-  ].join("\n");
+  // Only send error notifications for critical failures
+  if (context === "stock" || context === "webhook" || context === "auth") {
+    const text = [
+      "⚠️ ERROR CRITICO",
+      "",
+      `Contexto: ${context}`,
+      `Error: ${error}`,
+    ].join("\n");
 
-  return sendTelegramMessage(text);
+    return sendTelegramMessage(text);
+  }
+  
+  // Non-critical errors: just log, don't notify
+  console.log(`[v0] Non-critical error (${context}): ${error}`);
+  return Promise.resolve(true);
 }
 
+/**
+ * Notify when AI cannot answer a pre-sale question (CRITICAL).
+ */
 export async function notifyUnhandledQuestion(
   questionId: string,
   questionText: string,
@@ -85,7 +116,7 @@ export async function notifyUnhandledQuestion(
   itemId: string
 ) {
   const text = [
-    "PREGUNTA SIN RESPONDER",
+    "❓ NO ENTIENDO PREGUNTA",
     "",
     `Pregunta ID: ${questionId}`,
     `Publicacion: ${itemTitle}`,
@@ -93,27 +124,22 @@ export async function notifyUnhandledQuestion(
     "",
     `Pregunta: "${questionText}"`,
     "",
-    "El bot no pudo interpretar esta pregunta.",
-    "Respondela manualmente desde MercadoLibre.",
+    "La IA no pudo interpretar esta pregunta. Respondela manualmente en ML.",
   ].join("\n");
 
   return sendTelegramMessage(text);
 }
 
+/**
+ * Removed: New order notifications disabled per user request.
+ * Only send notifications for critical events (stock, AI confusion, errors).
+ */
 export async function notifyNewOrder(
   packId: string,
   productType: string,
   buyerNickname?: string
 ) {
-  const text = [
-    "NUEVA ORDEN",
-    "",
-    `Pack: ${packId}`,
-    `Producto: ${productType}`,
-    buyerNickname ? `Comprador: ${buyerNickname}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  return sendTelegramMessage(text);
+  // Notification disabled - only critical events trigger Telegram
+  console.log(`[v0] New order: ${packId} | ${productType} | ${buyerNickname || "N/A"}`);
+  return Promise.resolve(true);
 }

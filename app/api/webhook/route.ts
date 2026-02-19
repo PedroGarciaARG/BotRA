@@ -84,29 +84,38 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      case "messages":
-      case "marketplace_messages": {
-        console.log(`[v0] Processing message: resource=${resource}, user_id=${user_id}`);
+      case "messages": {
+        // ML sends resource as message_id (e.g. "o19c7348df3c717aa9ec52286eefdc96")
+        // Since we can't GET /messages/{messageId}, we trigger a check-messages scan
+        // which will find the pack with new buyer messages and respond
+        console.log(`[v0] Message webhook received: ${resource} for user ${user_id}`);
         try {
-          await handleMessageNotification(resource, String(user_id));
-          console.log(`[v0] Message processed successfully`);
-          addActivityLog({
-            type: "message",
-            message: `Mensaje procesado correctamente`,
-            details: `resource=${resource} | user_id=${user_id}`,
-          });
+          // Call the same logic as the polling endpoint
+          const { checkMessagesAndRespond } = await import("@/app/api/check-messages/route");
+          const result = await checkMessagesAndRespond();
+          console.log(`[v0] Message check result: processed=${result.processed}, responded=${result.responded}`);
         } catch (mErr) {
           const mMsg = mErr instanceof Error ? mErr.message : String(mErr);
-          const mStack = mErr instanceof Error ? mErr.stack : "";
           console.log(`[v0] Message handling FAILED: ${mMsg}`);
-          console.log(`[v0] Stack: ${mStack}`);
           addActivityLog({
             type: "error",
             message: `Error procesando mensaje: ${mMsg.slice(0, 120)}`,
-            details: `resource=${resource} | ${mMsg} | Stack: ${(mStack || "").slice(0, 200)}`,
+            details: resource,
           });
-          await notifyError("message", `${mMsg}\nResource: ${resource}\nUser: ${user_id}`).catch(() => {});
+          await notifyError("message", mMsg).catch(() => {});
         }
+        break;
+      }
+
+      case "payments":
+      case "orders_feedback": {
+        // These topics are not critical for bot operation, just log them
+        console.log(`[v0] Ignoring non-critical topic: ${topic}`);
+        addActivityLog({
+          type: "message",
+          message: `Webhook recibido (ignorado): ${topic}`,
+          details: resource,
+        });
         break;
       }
 

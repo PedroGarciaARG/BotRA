@@ -227,4 +227,3 @@ Genera una respuesta apropiada para esta pregunta de MercadoLibre. Si no podes r
     return null;
   }
 }
-
