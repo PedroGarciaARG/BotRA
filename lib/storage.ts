@@ -9,6 +9,7 @@ export interface PackState {
   productType: string;
   productTitle: string;
   status:
+    | "waiting_buyer"
     | "initial_sent"
     | "instructions_sent"
     | "code_sent"
