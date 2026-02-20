@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -35,6 +35,7 @@ export function ConnectionStatus({
   refreshing: boolean;
   onBotToggle: (enabled: boolean) => void;
 }) {
+  const [mounted, setMounted] = useState(false);
   const [sheetsStatus, setSheetsStatus] = useState<
     "idle" | "checking" | "connected" | "error"
   >("idle");
@@ -42,6 +43,11 @@ export function ConnectionStatus({
   const [refreshingToken, setRefreshingToken] = useState(false);
   const [togglingBot, setTogglingBot] = useState(false);
   const [runningDiag, setRunningDiag] = useState(false);
+
+  // Prevent hydration mismatch by only rendering after client mounts
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function handleVerifySheets() {
     setSheetsStatus("checking");
@@ -180,6 +186,16 @@ export function ConnectionStatus({
         month: "2-digit",
       })
     : null;
+
+  // Don't render until after hydration to avoid mismatch
+  if (!mounted) {
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="h-8 w-32 animate-pulse rounded bg-muted" />
+        <div className="h-8 w-24 animate-pulse rounded bg-muted" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-3">
