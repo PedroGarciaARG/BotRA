@@ -13,7 +13,17 @@ export interface PackState {
     | "instructions_sent"
     | "code_sent"
     | "cancelled"
-    | "human_requested";
+    | "human_requested"
+    | "waiting_buyer";
+  
+  // Antifraud tracking
+  codigo_enviado?: boolean;
+  codigo_enviado_at?: string;
+  instrucciones_enviadas?: boolean;
+  intentos_reenvio?: number;
+  ultimo_mensaje_comprador?: string;
+  ultimo_mensaje_comprador_at?: string;
+  
   codeDelivered?: string;
   createdAt: string;
   updatedAt: string;

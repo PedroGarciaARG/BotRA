@@ -11,14 +11,7 @@ export interface ProductConfig {
   finalMessage: string[];
 }
 
-const BRAND_FOOTER_PARTS = [
-  `❗Ya tenés tu Gift Card Digital Roblox! Que la disfrutes! Te pedimos que en cuanto recibas la tarjeta, confirmes en ML para que podamos seguir trabajando!`,
-  `Quedamos a tu disposición! 🤝 Somos Roblox_Argentina_ok`,
-  `❕Te dejamos nuestro contacto para que puedas agendarnos y aprovechar nuestras promos. 1138201597📱`
-];
-
-// For backward compatibility
-const BRAND_FOOTER = BRAND_FOOTER_PARTS;
+const BRAND_FOOTER = `Quedamos a tu disposicion! Somos Roblox Argentina. Te dejamos nuestro contacto para que puedas agendarnos y aprovechar nuestras promos: 1138201597`;
 
 export const PRODUCTS: ProductConfig[] = [
   {
@@ -27,43 +20,32 @@ export const PRODUCTS: ProductConfig[] = [
     sheetName: "roblox-10",
     keywords: ["roblox", "10", "usd", "dolar"],
     instructions: [
-      `Te cuento... La Gift Card que adquiriste se activa en 2 pasos.`,
-      
-      `- Primero vas a canjear el codigo por 10 usd (dolares) -no aparecen automaticamente los Robux, sino los 10 usd-`,
-      
-      `- Luego, con esos 10 USD te vas a suscribir al Premium de 9.99 USD y en ese momento se van a acreditar los Robux 800 + 200.`,
-      
-      `🔑 COMO CANJEAR?
+      `COMO CANJEAR GIFT CARD ROBLOX 10 USD
 
-1️⃣ Ingresa a www.roblox.com/redeem (desde un navegador, NO desde la app)`,
+Tene presente que es imprescindible recordar usuario y contrasena.
+IMPORTANTE: Esta tarjeta NO acredita Robux de manera directa, sino que acredita 10 USD y con ese saldo se compran los Robux.
 
-      `2️⃣ Inicia sesion en tu cuenta (si no te pide iniciar sesion es que ya existe una cuenta abierta *asegurate que sea la tuya*)`,
-      
-      `3️⃣ Ingresa el codigo
-4️⃣ Ya tenes los 10 usd!`,
+PASO A PASO:
+1. Ingresa a www.roblox.com/redeem (desde un navegador, NO desde la app)
+2. Inicia sesion en tu cuenta (asegurate que sea la tuya)
+3. Ingresa el codigo
+4. Ya tenes tus 10 USD!`,
 
-      `Una vez que tenes los 10 USD cargados.
-Ahora anda a:
+      `UNA VEZ QUE TENES LOS 10 USD CARGADOS:
+5. Anda a: www.roblox.com/premium/membership
+6. Elegi el plan Premium de USD 9.99
+7. Cuando te pide forma de pago, te va a aparecer "Pagar con credito de Roblox"
+8. NO hay que volver a poner el codigo
+9. Completa el e-mail de facturacion
+10. Apreta el boton de SUSCRIBIRSE
 
-https://www.roblox.com/premium/membership`,
-
-      `Elegi el plan Premium de USD 9.99.
-
-Cuando te pide forma de pago, te va a aparecer:
-✔ Pagar con credito de Roblox`,
-
-      `NO HAY QUE VOLVER A PONER EL CODIGO. 
-Si, SE DEBE COMPLETAR EL E-MAIL DE FACTURACION`,
-      
-      `IR HASTA ABAJO Y APRETAR EL BOTON DE SUSCRIBIRSE.`,
-
-      `Ya te enviamos la Gift Card`,
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
     ],
-    codeMessage: (code, title) => {
-      const img = `IMG-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-WA0000.jpeg`;
-      return `${img}\n\n`;
-    },
-    finalMessage: BRAND_FOOTER_PARTS,
+    codeMessage: (code, title) =>
+      `${title || "Gift Card Roblox 10 USD"}\nTu codigo: ${code}\n\nCanjealo en: www.roblox.com/redeem`,
+    finalMessage: [
+      `Ya tenes tu Gift Card Digital Roblox! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
+    ],
   },
   {
     key: "roblox-400",
@@ -71,22 +53,20 @@ Si, SE DEBE COMPLETAR EL E-MAIL DE FACTURACION`,
     sheetName: "roblox-400",
     keywords: ["roblox", "400", "robux"],
     instructions: [
-      `🔑 COMO CANJEAR?
+      `COMO CANJEAR GIFT CARD 400 ROBUX
 
-1️⃣ Ingresa a www.roblox.com/redeem (desde un navegador, NO desde la app)`,
+1. Ingresa a www.roblox.com/redeem (desde un navegador, NO desde la app)
+2. Inicia sesion en tu cuenta (asegurate que sea la tuya)
+3. Ingresa el codigo
+4. Ya tenes tus Robux!
 
-      `2️⃣ Inicia sesion en tu cuenta (si no te pide iniciar sesion es que ya existe una cuenta abierta *asegurate que sea la tuya*)`,
-      
-      `3️⃣ Ingresa el codigo
-4️⃣ Disfruta tus Robux!`,
-
-      `Ya te enviamos la Gift Card`,
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
     ],
-    codeMessage: (code, title) => {
-      const img = `IMG-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-WA0000.jpeg`;
-      return `${img}\n\n`;
-    },
-    finalMessage: BRAND_FOOTER_PARTS,
+    codeMessage: (code, title) =>
+      `${title || "Gift Card 400 Robux"}\nTu codigo: ${code}\n\nCanjealo en: www.roblox.com/redeem`,
+    finalMessage: [
+      `Ya tenes tu Gift Card Digital Roblox! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
+    ],
   },
   {
     key: "roblox-800",
@@ -94,22 +74,20 @@ Si, SE DEBE COMPLETAR EL E-MAIL DE FACTURACION`,
     sheetName: "roblox-800",
     keywords: ["roblox", "800", "robux"],
     instructions: [
-      `🔑 COMO CANJEAR?
+      `COMO CANJEAR GIFT CARD 800 ROBUX
 
-1️⃣ Ingresa a www.roblox.com/redeem (desde un navegador, NO desde la app)`,
+1. Ingresa a www.roblox.com/redeem (desde un navegador, NO desde la app)
+2. Inicia sesion en tu cuenta (asegurate que sea la tuya)
+3. Ingresa el codigo
+4. Ya tenes tus Robux!
 
-      `2️⃣ Inicia sesion en tu cuenta (si no te pide iniciar sesion es que ya existe una cuenta abierta *asegurate que sea la tuya*)`,
-      
-      `3️⃣ Ingresa el codigo
-4️⃣ Disfruta tus Robux!`,
-
-      `Ya te enviamos la Gift Card`,
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
     ],
-    codeMessage: (code, title) => {
-      const img = `IMG-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-WA0000.jpeg`;
-      return `${img}\n\n`;
-    },
-    finalMessage: BRAND_FOOTER_PARTS,
+    codeMessage: (code, title) =>
+      `${title || "Gift Card 800 Robux"}\nTu codigo: ${code}\n\nCanjealo en: www.roblox.com/redeem`,
+    finalMessage: [
+      `Ya tenes tu Gift Card Digital Roblox! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
+    ],
   },
   {
     key: "steam-5",
@@ -117,25 +95,19 @@ Si, SE DEBE COMPLETAR EL E-MAIL DE FACTURACION`,
     sheetName: "steam-5",
     keywords: ["steam", "5", "usd", "dolar"],
     instructions: [
-      `🔑 COMO CANJEAR?
+      `COMO CANJEAR GIFT CARD STEAM
 
-1️⃣ Ingresa a https://store.steampowered.com/account/redeemwalletcode?l=latam`,
+1. Ingresa a store.steampowered.com/account/redeemwalletcode
+2. Inicia sesion en tu cuenta
+3. Ingresa el codigo de la tarjeta
+4. Disfruta tu saldo!
 
-      `2️⃣ Inicia sesion en tu cuenta`,
-      
-      `3️⃣ Ingresa el codigo de la tarjeta
-4️⃣ Disfruta tu saldo!`,
-
-      `Ya te enviamos la Gift Card`,
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
     ],
-    codeMessage: (code, title) => {
-      const img = `IMG-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-WA0000.jpeg`;
-      return `${img}\n\n`;
-    },
+    codeMessage: (code, title) =>
+      `${title || "Gift Card Steam 5 USD"}\nTu codigo: ${code}\n\nCanjealo en: store.steampowered.com/account/redeemwalletcode`,
     finalMessage: [
-      `❗Ya tenes tu Gift Card *Steam* Que la disfrutes! Te pedimos que en cuanto recibas la tarjeta, confirmes en ML para que podamos seguir trabajando!`,
-      `Quedamos a tu disposición! 🤝 Somos Roblox_Argentina_ok`,
-      `❕Te dejamos nuestro contacto para que puedas agendarnos y aprovechar nuestras promos. 1138201597📱`
+      `Ya tenes tu Gift Card Steam! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
     ],
   },
   {
@@ -144,25 +116,19 @@ Si, SE DEBE COMPLETAR EL E-MAIL DE FACTURACION`,
     sheetName: "steam-10",
     keywords: ["steam", "10", "usd", "dolar"],
     instructions: [
-      `🔑 COMO CANJEAR?
+      `COMO CANJEAR GIFT CARD STEAM
 
-1️⃣ Ingresa a https://store.steampowered.com/account/redeemwalletcode?l=latam`,
+1. Ingresa a store.steampowered.com/account/redeemwalletcode
+2. Inicia sesion en tu cuenta
+3. Ingresa el codigo de la tarjeta
+4. Disfruta tu saldo!
 
-      `2️⃣ Inicia sesion en tu cuenta`,
-      
-      `3️⃣ Ingresa el codigo de la tarjeta
-4️⃣ Disfruta tu saldo!`,
-
-      `Ya te enviamos la Gift Card`,
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
     ],
-    codeMessage: (code, title) => {
-      const img = `IMG-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-WA0000.jpeg`;
-      return `${img}\n\n`;
-    },
+    codeMessage: (code, title) =>
+      `${title || "Gift Card Steam 10 USD"}\nTu codigo: ${code}\n\nCanjealo en: store.steampowered.com/account/redeemwalletcode`,
     finalMessage: [
-      `❗Ya tenes tu Gift Card *Steam* Que la disfrutes! Te pedimos que en cuanto recibas la tarjeta, confirmes en ML para que podamos seguir trabajando!`,
-      `Quedamos a tu disposición! 🤝 Somos Roblox_Argentina_ok`,
-      `❕Te dejamos nuestro contacto para que puedas agendarnos y aprovechar nuestras promos. 1138201597📱`
+      `Ya tenes tu Gift Card Steam! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
     ],
   },
 ];
@@ -192,20 +158,29 @@ export function getProductByKey(key: string): ProductConfig | undefined {
   return PRODUCTS.find((p) => p.key === key);
 }
 
-// Initial welcome message - Direct greeting that leads into asking about experience
+// Initial welcome message (sent when order is paid)
+// Consolidated into a single message to minimize message count (ML best practice)
 export const WELCOME_MESSAGE = [
-  `Hola! Gracias por tu compra en Roblox Argentina. Tenes experiencia cargando Gift Card?`,
+  `Hola! Gracias por tu compra en Roblox Argentina.
+
+Tu Gift Card es 100% digital. El codigo se entrega por este chat de forma instantanea y el envio es gratuito.
+
+Por favor responde con una de estas opciones:
+- "SI" para recibir tu codigo ahora
+- "NO" si queres cancelar la compra
+- "HUMANO" si necesitas hablar con una persona
+
+Tu codigo esta listo, solo esperamos tu confirmacion.`,
 ];
 
-// Simple thank you response (when buyer says thanks after receiving code)
-export const THANKS_RESPONSE = `A vos por tu compra!`;
-export const THANKS_RESPONSE_ALT = `Muchas gracias por tu compra!`;
+// Cancellation instructions
+export const CANCEL_MESSAGE = `Entendemos tu decision. Para cancelar la compra anda a "Mis Compras" en Mercado Libre, selecciona esta compra y hace click en "Cancelar compra". ML te reintegrara el dinero automaticamente. Si necesitas ayuda responde "AYUDA".`;
 
-// Cancellation instructions (rarely used, only if explicitly requested)
-export const CANCEL_MESSAGE = `Entendemos tu decision. Para cancelar la compra anda a "Mis Compras" en Mercado Libre, selecciona esta compra y hace click en "Cancelar compra". ML te reintegrara el dinero automaticamente.`;
+// Human handoff message
+export const HUMAN_MESSAGE = `Te conectamos con un asesor humano. Un vendedor te respondera a la brevedad. Mientras tanto, por favor detallanos tu consulta.`;
 
-// Reminder when waiting for "LISTO" (simplified, no mention of human)
-export const REMINDER_MESSAGE = `Responde "LISTO" cuando estes listo para recibir tu codigo.`;
+// Unrecognized response reminder (sent after instructions, waiting for "LISTO")
+export const REMINDER_MESSAGE = `Responde "LISTO" cuando estes listo para recibir tu codigo. Si necesitas ayuda responde "HUMANO".`;
 
 // =====================================================================
 // Question response catalog – comprehensive Q&A for all gift cards.

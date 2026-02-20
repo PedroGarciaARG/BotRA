@@ -1,44 +1,10 @@
-// OpenAI GPT integration for intelligent, conversational responses.
-// Responds naturally to buyer questions with context awareness and FAQ knowledge.
-// Messages are automatically split into chunks of max 350 characters.
+// OpenAI GPT integration for generating intelligent question responses.
+// Used as fallback when keyword matching doesn't find a predefined response.
 // Returns null when the question cannot be answered (triggers Telegram alert).
 
 import { generateText } from "ai";
 
-const CHAT_SYSTEM_PROMPT = `Sos un vendedor de "Roblox Argentina" en MercadoLibre. Hablas por chat de manera natural, directa y concisa.
-
-PRODUCTOS:
-- Roblox 400/800 Robux: Se canjean en www.roblox.com/redeem (800+ incluye item exclusivo)
-- Roblox 10 USD: Acredita 10 USD, se usa para comprar Premium de 9.99 USD (que da 1000 Robux) o comprar 1000 Robux solamente
-- Steam 5/10 USD: Se canjean en store.steampowered.com/account/redeemwalletcode
-
-CONOCIMIENTO CLAVE:
-- Envio: Digital por chat ML, instantaneo, sin costo
-- Vigencia: 3 meses para canjear
-- Cobertura: Todo el pais
-- Stock: Siempre disponible
-- Ayuda: Guiamos paso a paso
-- Para otra cuenta: Si, se puede
-- Personalizar: Si, para regalo
-- Premium Argentina: Las de 10 USD sirven para contratar Premium de 9.99 (da 1000 Robux)
-- Medios de pago: Todos los de ML
-
-ESTILO DE RESPUESTA:
-- Espanol argentino natural (vos, tenes, podes)
-- Respuestas cortas y directas (1-3 oraciones maximo)
-- NO repitas informacion que ya se envio en las instrucciones
-- Si ya respondiste algo similar, da una respuesta breve y diferente
-- NO uses emojis ni markdown ni asteriscos
-- Analiza lo que dice el comprador y responde con sentido
-
-RESPUESTAS ESPECIALES:
-- Si pide hablar con persona: NO_RESPONDER
-- Si no podes ayudar con certeza: NO_RESPONDER
-- Si pregunta algo ya explicado en las instrucciones: Responde BREVEMENTE sin repetir todo
-
-IMPORTANTE: Se conciso. El comprador ya recibio las instrucciones completas. Solo responde dudas especificas brevemente.`;
-
-const QUESTION_SYSTEM_PROMPT = `Sos un asistente de ventas de "Roblox Argentina" en MercadoLibre.
+const SYSTEM_PROMPT = `Sos un asistente de ventas de "Roblox Argentina" en MercadoLibre.
 Vendes Gift Cards digitales de Steam y Roblox.
 
 PRODUCTOS QUE VENDES:
@@ -63,10 +29,10 @@ ROBLOX 400 y 800 ROBUX:
 10. Hacen envios a mi provincia? -> Si, como es digital funciona en todo el pais.
 
 ROBLOX 10 USD:
-1. Cuantos Robux son 10 USD? -> Acredita 10 USD. Con eso podes comprar Premium de 9.99 USD (que te da 1000 Robux) o comprar 1000 Robux solamente.
-2. Acredita Robux directamente? -> No. Primero acredita 10 USD, luego vos elegis si comprar Premium de 9.99 (da 1000 Robux) o comprar 1000 Robux directamente.
+1. Cuantos Robux son 10 USD? -> Acredita 10 USD. Con eso podes comprar 1000 Robux o contratar Premium.
+2. Acredita Robux directamente? -> No. Primero 10 USD, luego elegis que comprar.
 3. Sirve para cualquier pais? -> Si, es region global.
-4. Se puede usar para pagar Premium en Argentina? -> Si, justamente se usa para contratar Premium de 9.99 USD cuando la app no permite pagar por region.
+4. Se puede usar para pagar Premium en Argentina? -> Si, justamente se usa para eso cuando la app no permite pagar por region.
 5. El envio es inmediato? -> Si, a los pocos minutos luego de acreditado el pago.
 6. Me mandan tarjeta fisica? -> No. Se envia tarjeta digital con el codigo.
 7. Donde me llega? -> Por chat privado de Mercado Libre.
@@ -100,96 +66,7 @@ responde UNICAMENTE con la palabra: NO_RESPONDER
 No agregues nada mas en ese caso.`;
 
 /**
- * Split a long message into chunks of max 350 characters, breaking at sentence boundaries.
- */
-export function splitMessageIntoChunks(text: string, maxLength = 350): string[] {
-  if (text.length <= maxLength) return [text];
-
-  const chunks: string[] = [];
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  
-  let currentChunk = "";
-  
-  for (const sentence of sentences) {
-    if (currentChunk.length + sentence.length + 1 <= maxLength) {
-      currentChunk += (currentChunk ? " " : "") + sentence;
-    } else {
-      if (currentChunk) chunks.push(currentChunk.trim());
-      
-      // Si la sentencia sola es más larga que maxLength, dividir por palabras
-      if (sentence.length > maxLength) {
-        const words = sentence.split(" ");
-        currentChunk = "";
-        for (const word of words) {
-          if (currentChunk.length + word.length + 1 <= maxLength) {
-            currentChunk += (currentChunk ? " " : "") + word;
-          } else {
-            if (currentChunk) chunks.push(currentChunk.trim());
-            currentChunk = word;
-          }
-        }
-      } else {
-        currentChunk = sentence;
-      }
-    }
-  }
-  
-  if (currentChunk) chunks.push(currentChunk.trim());
-  
-  return chunks;
-}
-
-/**
- * Generate a conversational chat response with context awareness.
- * Used for natural back-and-forth conversation during the order flow.
- * Returns null if AI cannot help (triggers human intervention).
- */
-export async function generateChatResponse(
-  buyerMessage: string,
-  productTitle: string,
-  conversationContext?: string
-): Promise<string[] | null> {
-  try {
-    const contextInfo = conversationContext 
-      ? `\nContexto de la conversacion: ${conversationContext}` 
-      : "";
-
-    const userPrompt = `Producto comprado: ${productTitle}${contextInfo}
-
-Comprador dice: "${buyerMessage}"
-
-Responde de manera natural y conversacional. Analiza lo que dice y responde con sentido.
-Si no podes ayudar, responde SOLO: NO_RESPONDER
-Si pide hablar con una persona, responde SOLO: HUMANO_SOLICITADO`;
-
-    const { text } = await generateText({
-      model: "openai/gpt-4o-mini" as never,
-      system: CHAT_SYSTEM_PROMPT,
-      prompt: userPrompt,
-      maxTokens: 300,
-    });
-
-    const trimmed = text.trim();
-
-    // Check for special responses
-    if (trimmed === "NO_RESPONDER" || trimmed.startsWith("NO_RESPONDER")) {
-      return null;
-    }
-    
-    if (trimmed === "HUMANO_SOLICITADO" || trimmed.startsWith("HUMANO_SOLICITADO")) {
-      return null; // Will trigger human handoff in calling code
-    }
-
-    // Split response into 350-char chunks
-    return splitMessageIntoChunks(trimmed);
-  } catch (err) {
-    console.log("[v0] AI chat response error:", err instanceof Error ? err.message : err);
-    return null;
-  }
-}
-
-/**
- * Generate a question response using GPT (for pre-sale questions).
+ * Generate a question response using GPT.
  * Returns null if GPT determines the question should not be answered automatically.
  */
 export async function generateQuestionResponse(
@@ -207,7 +84,7 @@ Genera una respuesta apropiada para esta pregunta de MercadoLibre. Si no podes r
 
     const { text } = await generateText({
       model: "openai/gpt-4o-mini" as never,
-      system: QUESTION_SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT,
       prompt: userPrompt,
       maxTokens: 500,
     });

@@ -44,6 +44,17 @@ export default function DashboardPage() {
 
   const [botEnabledLocal, setBotEnabledLocal] = useState<boolean | null>(null);
 
+  // Sync botEnabledLocal with server value only on first load
+  useEffect(() => {
+    if (botEnabledLocal === null && statsData?.botEnabled !== undefined) {
+      setBotEnabledLocal(statsData.botEnabled);
+    }
+  }, []); // Only run once on mount
+
+  const handleBotToggle = useCallback((enabled: boolean) => {
+    setBotEnabledLocal(enabled);
+  }, []);
+
   const stats = statsData?.stats || {
     totalOrders: 0,
     codesDelivered: 0,
@@ -56,7 +67,7 @@ export default function DashboardPage() {
   const packs = statsData?.activePacks || [];
   const authenticated = statsData?.authenticated || false;
   const authError = statsData?.authError || null;
-  const botEnabled = botEnabledLocal ?? statsData?.botEnabled ?? true;
+  const botEnabled = botEnabledLocal !== null ? botEnabledLocal : (statsData?.botEnabled ?? true);
   const tokenExpiresAt = statsData?.tokenExpiresAt ?? undefined;
 
   // Auto-check for new messages every 15 seconds (since ML webhooks may not work for messages)
@@ -87,15 +98,15 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl text-balance">
             Roblox Argentina Bot
           </h1>
-          <ConnectionStatus
-            authenticated={authenticated}
-            authError={authError}
-            botEnabled={botEnabled}
-            tokenExpiresAt={tokenExpiresAt}
-            onRefresh={handleRefresh}
-            refreshing={statsValidating}
-            onBotToggle={(enabled) => setBotEnabledLocal(enabled)}
-          />
+        <ConnectionStatus
+          authenticated={authenticated}
+          authError={authError}
+          botEnabled={botEnabled}
+          tokenExpiresAt={tokenExpiresAt}
+          onRefresh={handleRefresh}
+          refreshing={statsValidating}
+          onBotToggle={handleBotToggle}
+        />
         </div>
 
         {/* Tabs */}
