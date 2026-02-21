@@ -23,6 +23,7 @@ export interface PackState {
   intentos_reenvio?: number;
   ultimo_mensaje_comprador?: string;
   ultimo_mensaje_comprador_at?: string;
+  ultimo_mensaje_hash?: string; // Hash del último mensaje del comprador que procesamos
   
   codeDelivered?: string;
   createdAt: string;

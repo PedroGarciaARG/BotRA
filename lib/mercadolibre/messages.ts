@@ -1,6 +1,6 @@
-// Handle post-sale message notifications from MercadoLibre.
-// Anti-fraud system to prevent code resending and product changes.
-// AI-powered responses for customer questions with human escalation.
+// Handle post-sale message notifications from MercadoLibre
+// Anti-fraud system to prevent code resending and product changes
+// AI-powered responses for customer questions with human escalation
 
 import {
   getPackMessages,
@@ -22,9 +22,15 @@ import {
 import { addActivityLog, getPackState, setPackState, updatePackState } from "@/lib/storage";
 import { getAvailableCode, markCodeDelivered } from "@/lib/google-sheets";
 import { notifyHumanRequested, notifyCodeDelivered, notifyError } from "@/lib/telegram";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
+import crypto from "crypto";
 
 // ============= ANTI-FRAUD HELPERS =============
+
+function getMessageHash(text: string): string {
+  return crypto.createHash("md5").update(text.toLowerCase().trim()).digest("hex");
+}
 
 function isCodeRequest(text: string): boolean {
   // Detect when user is asking for/confirming they want the code
@@ -166,6 +172,14 @@ async function tryAIResponse(
   buyerId: string
 ): Promise<boolean> {
   try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      console.log(`[v0] OPENAI_API_KEY not set, skipping AI response`);
+      return false;
+    }
+
+    const openai = createOpenAI({ apiKey });
+
     const isRoblox = productTitle.toLowerCase().includes("roblox");
     const isSteam = productTitle.toLowerCase().includes("steam");
     const redeemUrl = isRoblox
@@ -201,7 +215,7 @@ Reglas:
 Si NO PODES ayudar con la consulta específica, responde SOLO: NO_RESPONDER`;
 
     const { text } = await generateText({
-      model: "openai/gpt-4o-mini" as never,
+      model: openai("gpt-4o-mini"),
       system: systemPrompt,
       prompt: `Comprador pregunta: "${buyerText}"\n\nResponde:`,
       maxTokens: 150,
@@ -222,7 +236,7 @@ Si NO PODES ayudar con la consulta específica, responde SOLO: NO_RESPONDER`;
     });
     return true;
   } catch (err) {
-    console.log(`[v0] AI response failed:`, err);
+    console.log(`[v0] AI response failed:`, err instanceof Error ? err.message : err);
     return false;
   }
 }
@@ -306,10 +320,18 @@ export async function handleMessageNotification(
     setPackState(packId, state);
   }
 
-  // Update with latest buyer message
+  // ============= DEDUPLICATION: Check if we already processed this exact message =============
+  const currentHash = getMessageHash(lastBuyerText);
+  if (state.ultimo_mensaje_hash === currentHash) {
+    console.log(`[v0] Duplicate message detected (hash=${currentHash}), skipping pack ${packId}`);
+    return;
+  }
+
+  // Update with latest buyer message and hash
   updatePackState(packId, {
     ultimo_mensaje_comprador: lastBuyerText,
     ultimo_mensaje_comprador_at: new Date().toISOString(),
+    ultimo_mensaje_hash: currentHash,
   });
 
   // ============= ANTI-FRAUD: Code Resend Attempt =============
@@ -375,28 +397,8 @@ export async function handleMessageNotification(
   if (status === "no_seller_msgs") {
     console.log(`[v0] First interaction - sending welcome + instructions`);
 
-    // Check stock
-    let code: { code: string; row: number } | null = null;
-    try {
-      code = await getAvailableCode(product.sheetName);
-      if (!code) {
-        const stockMsg = `Gracias por tu compra! En breve te enviamos tu gift card.`;
-        await safeSendMessage(packId, sellerId, stockMsg, buyerId);
-        await notifyError("stock", `Sin stock: ${productTitle}`);
-        addActivityLog({
-          type: "error",
-          message: `Sin stock: ${product.label}`,
-          details: `Pack: ${packId}`,
-        });
-        return;
-      }
-    } catch (err) {
-      console.log(`[v0] Stock check failed:`, err);
-      await notifyError("stock", `Error checking stock: ${productTitle}`);
-      return;
-    }
-
-    // Send welcome + instructions
+    // Send welcome + instructions WITHOUT checking stock
+    // Stock will be checked only when buyer asks for code
     const welcomeAndInstructions = [...WELCOME_MESSAGE, ...product.instructions];
     await safeSendMessages(packId, sellerId, welcomeAndInstructions, buyerId);
 
@@ -423,12 +425,17 @@ export async function handleMessageNotification(
       if (!code) {
         try {
           const codeData = await getAvailableCode(product.sheetName);
-          if (!codeData) {
-            const stockMsg = `Gracias por tu paciencia! En breve te enviamos tu gift card.`;
-            await safeSendMessage(packId, sellerId, stockMsg, buyerId);
-            await notifyError("stock", `Sin stock al entregar: ${productTitle}`);
-            return;
-          }
+      if (!codeData) {
+        const stockMsg = `Gracias por tu paciencia! En breve te enviamos tu gift card.`;
+        await safeSendMessage(packId, sellerId, stockMsg, buyerId);
+        await notifyError("stock", `SIN STOCK - Producto: ${productTitle}, Pack: ${packId}, Buyer: ${buyerId}`);
+        addActivityLog({
+          type: "error",
+          message: `SIN STOCK al entregar: ${product.label}`,
+          details: `Pack: ${packId}`,
+        });
+        return;
+      }
           code = codeData.code;
           await markCodeDelivered(product.sheetName, codeData.row, orderId);
         } catch (err) {
