@@ -6,11 +6,15 @@ async function sendTelegramMessage(text: string): Promise<boolean> {
   const { TELEGRAM_TOKEN, TELEGRAM_CHAT_ID } = getConfig();
 
   if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.error("Telegram credentials not configured");
+    console.log("[v0] Telegram not configured: TOKEN=%s, CHAT_ID=%s", 
+      TELEGRAM_TOKEN ? "set" : "missing", 
+      TELEGRAM_CHAT_ID ? "set" : "missing"
+    );
     return false;
   }
 
   try {
+    console.log("[v0] Sending Telegram message...");
     const res = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
       {
@@ -24,9 +28,16 @@ async function sendTelegramMessage(text: string): Promise<boolean> {
       }
     );
 
-    return res.ok;
+    if (!res.ok) {
+      const err = await res.text();
+      console.log("[v0] Telegram error response:", err);
+      return false;
+    }
+
+    console.log("[v0] Telegram message sent successfully");
+    return true;
   } catch (err) {
-    console.error("Telegram send error:", err);
+    console.log("[v0] Telegram send error:", err);
     return false;
   }
 }

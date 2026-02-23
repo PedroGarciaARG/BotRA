@@ -43,17 +43,34 @@ export default function DashboardPage() {
   }, [refreshStats, refreshInventory]);
 
   const [botEnabledLocal, setBotEnabledLocal] = useState<boolean | null>(null);
+  const [botJustToggled, setBotJustToggled] = useState(false);
 
   // Sync botEnabledLocal with server value only on first load
   useEffect(() => {
-    if (botEnabledLocal === null && statsData?.botEnabled !== undefined) {
+    if (botEnabledLocal === null && statsData?.botEnabled !== undefined && !botJustToggled) {
       setBotEnabledLocal(statsData.botEnabled);
     }
   }, []); // Only run once on mount
 
-  const handleBotToggle = useCallback((enabled: boolean) => {
+  const handleBotToggle = useCallback(async (enabled: boolean) => {
     setBotEnabledLocal(enabled);
-  }, []);
+    setBotJustToggled(true);
+    
+    try {
+      await fetch("/api/bot/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      // Refresh stats to sync server state
+      await refreshStats();
+    } catch (err) {
+      console.log("[v0] Toggle failed:", err);
+    } finally {
+      // Reset flag after 100ms to allow next sync
+      setTimeout(() => setBotJustToggled(false), 100);
+    }
+  }, [refreshStats]);
 
   const stats = statsData?.stats || {
     totalOrders: 0,

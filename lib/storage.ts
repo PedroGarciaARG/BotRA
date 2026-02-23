@@ -12,6 +12,10 @@ export interface PackState {
     | "initial_sent"
     | "instructions_sent"
     | "code_sent"
+    | "waiting_choice" // Waiting for Premium or Robux choice (Roblox 5 USD only)
+    | "premium_sent" // Premium instructions sent
+    | "robux_sent" // Robux instructions sent
+    | "completed" // Final message sent
     | "cancelled"
     | "human_requested"
     | "waiting_buyer";

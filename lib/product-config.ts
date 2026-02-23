@@ -131,6 +131,48 @@ Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
       `Ya tenes tu Gift Card Steam! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
     ],
   },
+  {
+    key: "steam-20",
+    label: "Steam 20 USD",
+    sheetName: "steam-20",
+    keywords: ["steam", "20", "usd", "dolar"],
+    instructions: [
+      `COMO CANJEAR GIFT CARD STEAM
+
+1. Ingresa a store.steampowered.com/account/redeemwalletcode
+2. Inicia sesion en tu cuenta
+3. Ingresa el codigo de la tarjeta
+4. Disfruta tu saldo!
+
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
+    ],
+    codeMessage: (code, title) =>
+      `${title || "Gift Card Steam 20 USD"}\nTu codigo: ${code}\n\nCanjealo en: store.steampowered.com/account/redeemwalletcode`,
+    finalMessage: [
+      `Ya tenes tu Gift Card Steam! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
+    ],
+  },
+  {
+    key: "roblox-5",
+    label: "Roblox 5 USD",
+    sheetName: "roblox-5",
+    keywords: ["roblox", "5", "usd", "dolar"],
+    instructions: [
+      `COMO CANJEAR GIFT CARD ROBLOX 5 USD
+
+1. Ingresa a www.roblox.com/redeem (desde un navegador, NO desde la app)
+2. Inicia sesion en tu cuenta (asegurate que sea la tuya)
+3. Ingresa el codigo
+4. Ya tenes tus 5 USD!
+
+Estas listo para recibir tu codigo? Responde "LISTO" y te lo enviamos.`,
+    ],
+    codeMessage: (code, title) =>
+      `${title || "Gift Card Roblox 5 USD"}\nTu codigo: ${code}\n\nCanjealo en: www.roblox.com/redeem`,
+    finalMessage: [
+      `Ya tenes tu Gift Card Digital Roblox! Que la disfrutes! Te pedimos que en cuanto la recibas, confirmes en ML para que podamos seguir trabajando. ${BRAND_FOOTER}`,
+    ],
+  },
 ];
 
 /**
@@ -202,7 +244,8 @@ export const QUESTION_RESPONSES: Array<{
 }> = [
 
   // =================================================================
-  //  ROBLOX 400 & 800 ROBUX  (general questions apply to all products)
+  //  ALL PRODUCTS (Roblox 5/10 USD, 400/800 Robux, Steam 5/10/20 USD)
+  //  General questions apply to all gift card products
   // =================================================================
 
   // 1. Envio fisico o digital
