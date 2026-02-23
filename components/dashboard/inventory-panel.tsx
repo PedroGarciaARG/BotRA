@@ -11,6 +11,8 @@ interface InventoryData {
 const PRODUCT_LABELS: Record<string, string> = {
   "steam-5": "Steam 5 USD",
   "steam-10": "Steam 10 USD",
+  "steam-20": "Steam 20 USD",
+  "roblox-5": "Roblox 5 USD",
   "roblox-10": "Roblox 10 USD",
   "roblox-400": "Roblox 400 Robux",
   "roblox-800": "Roblox 800 Robux",
@@ -19,6 +21,8 @@ const PRODUCT_LABELS: Record<string, string> = {
 const PRODUCT_COLORS: Record<string, string> = {
   "steam-5": "bg-chart-3",
   "steam-10": "bg-chart-3",
+  "steam-20": "bg-chart-3",
+  "roblox-5": "bg-chart-5",
   "roblox-10": "bg-chart-5",
   "roblox-400": "bg-chart-5",
   "roblox-800": "bg-chart-5",
